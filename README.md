@@ -17,6 +17,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 - [Architecture, order state machine, Shiprocket workflow, folder structure, phase plan](docs/ARCHITECTURE.md)
 - [Database design & ER diagram](docs/DATABASE.md)
 - [REST API reference](docs/API.md) (interactive version at `/api-docs`)
+- [Deploying to Azure Container Apps (free tier, private DB)](docs/AZURE.md)
 - [Deployment & going live with each integration](docs/DEPLOYMENT.md)
 
 ## Local setup
@@ -98,6 +99,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 | `npm run db:deploy` | Apply migrations |
 | `npm run db:seed` | Reset and load demo data. **This truncates all tables.** |
 | `npm run db:studio` | Prisma Studio |
+| `npm run setup:prod` | Production-safe setup: roles, default categories, admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD` (never deletes) |
 
 ## Tests
 

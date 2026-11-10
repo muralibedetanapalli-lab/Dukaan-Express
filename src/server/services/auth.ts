@@ -31,7 +31,9 @@ export async function requestOtp(phone: string) {
   const code = randomDigits(6);
   await db.otp.create({ data: { phone, codeHash: otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS) } });
   const { mock } = await sendOtpSms(phone, code);
-  const exposeDevOtp = mock && process.env.NODE_ENV !== "production";
+  // OTP_SANDBOX_IN_PRODUCTION=true shows the OTP on screen when no SMS provider is configured.
+  // For private pilots only — anyone could then log in as any phone number.
+  const exposeDevOtp = mock && (process.env.NODE_ENV !== "production" || process.env.OTP_SANDBOX_IN_PRODUCTION === "true");
   return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000, devOtp: exposeDevOtp ? code : undefined, smsMode: integrationModes().sms };
 }
 

@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.local
+.claude
+.env
+.env.*
+!.env.example
+coverage
+tests
+docs
+public/uploads/*
+public/seed
+scripts/dist
+src/generated
+*.log

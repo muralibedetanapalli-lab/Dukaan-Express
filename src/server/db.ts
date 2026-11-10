@@ -5,7 +5,13 @@ import { PrismaClient } from "@/generated/prisma/client";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+  // Small Postgres tiers (e.g. Azure B1ms) allow ~50 connections; keep each instance modest.
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL!,
+    max: Number(process.env.DB_POOL_MAX ?? 5),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],

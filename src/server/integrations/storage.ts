@@ -49,6 +49,11 @@ export async function uploadImage(file: File, folder: "products" | "shops" | "ca
     return { url: json.secure_url };
   }
 
+  // Container disks are ephemeral: refuse silently-lost uploads in production.
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_LOCAL_UPLOADS !== "true") {
+    throw badRequest("Image storage is not configured. Set the CLOUDINARY_* environment variables to enable uploads.");
+  }
+
   // Local disk (development). Files land in /public/uploads and are served statically.
   const dir = path.join(process.cwd(), "public", "uploads", folder);
   await mkdir(dir, { recursive: true });

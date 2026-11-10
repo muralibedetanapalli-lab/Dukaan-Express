@@ -8,6 +8,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the Docker image (Azure Container Apps)
+  output: "standalone",
   serverExternalPackages: ["pg", "@prisma/adapter-pg", "exceljs", "pdf-lib"],
   images: {
     remotePatterns: [

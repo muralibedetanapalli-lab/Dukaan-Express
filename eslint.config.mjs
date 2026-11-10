@@ -2,5 +2,5 @@ import next from "eslint-config-next";
 
 export default [
   ...next,
-  { ignores: ["src/generated/**", ".next/**", ".local/**", "node_modules/**"] },
+  { ignores: ["src/generated/**", ".next/**", ".local/**", "node_modules/**", "scripts/dist/**"] },
 ];
