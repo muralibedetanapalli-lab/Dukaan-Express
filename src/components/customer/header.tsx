@@ -108,7 +108,7 @@ export function MobileCartBar() {
   return (
     <Link
       href="/cart"
-      className="fixed inset-x-3 bottom-[4.5rem] z-40 flex items-center justify-between rounded-2xl bg-primary px-4 py-3 text-primary-foreground shadow-xl sm:hidden"
+      className="fixed inset-x-3 bottom-[calc(4.5rem+var(--sab,0px))] z-40 flex items-center justify-between rounded-2xl bg-primary px-4 py-3 text-primary-foreground shadow-xl sm:hidden"
     >
       <span className="flex items-center gap-2">
         <ShoppingBag className="size-5" />

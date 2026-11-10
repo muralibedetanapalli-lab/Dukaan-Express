@@ -152,3 +152,11 @@ html[data-native] header.sticky {
 html[data-native] nav.fixed.bottom-0 {
   padding-bottom: var(--sab);
 }
+/* bottom sheets & dialogs anchored to the bottom stay above the system navigation bar */
+html[data-native] [data-slot="sheet-content"] {
+  padding-bottom: var(--sab);
+}
+/* toasts below the status bar */
+html[data-native] [data-sonner-toaster][data-y-position="top"] {
+  top: calc(var(--sat) + 12px) !important;
+}
