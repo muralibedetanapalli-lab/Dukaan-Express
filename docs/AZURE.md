@@ -98,7 +98,7 @@ read -p  "DB admin user: " PGUSER
 read -sp "DB password: " PGPASS; echo
 # URL-encode the password in case it has @ # : / characters
 PGPASS_ENC=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$PGPASS")
-DBURL="postgresql://${PGUSER}:${PGPASS_ENC}@${PG}.postgres.database.azure.com:5432/dukaan?sslmode=require"
+DBURL="postgresql://${PGUSER}:${PGPASS_ENC}@${PG}.postgres.database.azure.com:5432/dukaan?sslmode=verify-full"
 JWT=$(openssl rand -base64 48 | tr -d '\n')
 CRON=$(openssl rand -hex 24)
 
@@ -161,6 +161,8 @@ az ad app federated-credential create --id $APPID --parameters '{
   "subject": "repo:muralibedetanapalli-lab/Dukaan-Express:environment:production",
   "audiences": ["api://AzureADTokenExchange"]
 }'
+# GitHub may present an ID-based subject instead (repo:<owner>@<ownerId>/<repo>@<repoId>:environment:production).
+# If azure/login fails with AADSTS700213, add a second credential with the exact subject from the error message.
 # Least privilege: the deploy identity can only update these three resources (not the database).
 for r in $(az containerapp show -g $RG -n $APP --query id -o tsv) \
          $(az containerapp job show -g $RG -n dukaan-setup --query id -o tsv) \
