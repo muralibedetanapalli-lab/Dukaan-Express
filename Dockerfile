@@ -41,6 +41,7 @@ COPY --from=build --chown=app:app /src/.next/standalone ./
 COPY --from=build --chown=app:app /src/.next/static ./.next/static
 COPY --from=build --chown=app:app /src/public ./public
 COPY --from=build --chown=app:app /src/scripts/dist/setup.mjs ./scripts/setup.mjs
+COPY --from=build --chown=app:app /src/scripts/cron.mjs ./scripts/cron.mjs
 COPY --from=tools --chown=app:app /tools ./tools
 COPY --chown=app:app docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh

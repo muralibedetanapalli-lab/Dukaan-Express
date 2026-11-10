@@ -147,7 +147,7 @@ az containerapp job create -g $RG -n dukaan-cron --environment $CAE --workload-p
   --image "$IMAGE" --cpu 0.25 --memory 0.5Gi \
   --secrets cron-secret="$CRON" \
   --env-vars APP_URL="https://$FQDN" CRON_SECRET=secretref:cron-secret \
-  --command "node" --args "-e" "fetch(process.env.APP_URL+'/api/v1/cron/maintenance',{headers:{authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
+  --command "node" --args "scripts/cron.mjs"
 ```
 
 ## 7. Automatic deploys from GitHub (OIDC — no stored Azure passwords)
