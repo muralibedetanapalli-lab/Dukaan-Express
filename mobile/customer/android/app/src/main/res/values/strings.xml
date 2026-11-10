@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dukaan Express</string>
+    <string name="title_activity_main">Dukaan Express</string>
+    <string name="package_name">in.dukaanexpress.customer</string>
+    <string name="custom_url_scheme">in.dukaanexpress.customer</string>
+</resources>

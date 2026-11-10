@@ -37,6 +37,8 @@ export interface PushMessage {
   body: string;
   data?: Record<string, string>;
   link?: string;
+  /** Android notification channel created by the app: "orders" (loud) or "general" */
+  channel?: "orders" | "general";
 }
 
 /** Returns tokens that FCM reported as invalid so callers can prune them. */
@@ -59,12 +61,18 @@ export async function sendPush(tokens: string[], msg: PushMessage): Promise<{ in
               token,
               notification: { title: msg.title, body: msg.body },
               data: msg.data ?? {},
+              android: { priority: "HIGH", notification: { channel_id: msg.channel ?? "general", sound: "default" } },
               webpush: msg.link ? { fcm_options: { link: msg.link } } : undefined,
             },
           }),
           signal: AbortSignal.timeout(8000),
         });
-        if (res.status === 404 || res.status === 400) invalid.push(token);
+        if (!res.ok) {
+          const err = await res.text();
+          // Only drop tokens FCM says are dead — never on payload/auth errors.
+          if (res.status === 404 || /UNREGISTERED|registration-token-not-registered/i.test(err)) invalid.push(token);
+          else console.warn("[fcm] send failed", res.status, err.slice(0, 300));
+        }
       } catch (e) {
         console.warn("[fcm] send failed", e);
       }

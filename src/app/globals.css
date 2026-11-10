@@ -128,3 +128,27 @@
     display: none;
   }
 }
+
+/* ── Native app (Capacitor) edge-to-edge insets. All values are 0 in normal browsers. ── */
+:root {
+  --sat: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+}
+html[data-native] body {
+  padding-top: var(--sat);
+}
+/* opaque strip behind the status bar */
+html[data-native] body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--sat);
+  background: var(--background);
+  z-index: 60;
+}
+html[data-native] header.sticky {
+  top: var(--sat);
+}
+html[data-native] nav.fixed.bottom-0 {
+  padding-bottom: var(--sab);
+}

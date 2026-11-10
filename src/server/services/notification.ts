@@ -50,7 +50,7 @@ export async function notifyUsers(userIds: string[], n: NotifyInput) {
       const tokens = await db.deviceToken.findMany({ where: { userId: { in: ids } } });
       const { invalidTokens } = await sendPush(
         tokens.map((t) => t.token),
-        { title: n.title, body: n.body, data, link: n.link },
+        { title: n.title, body: n.body, data, link: n.link, channel: n.type === "ORDER_NEW" ? "orders" : "general" },
       );
       if (invalidTokens.length) await db.deviceToken.deleteMany({ where: { token: { in: invalidTokens } } });
     } catch (e) {

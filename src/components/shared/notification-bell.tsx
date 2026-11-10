@@ -10,6 +10,7 @@ import { api } from "@/lib/api-client";
 import { fmtAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { RealtimeListener } from "./realtime";
+import { PushRegistrar } from "./native-bridge";
 
 interface N {
   id: string;
@@ -53,6 +54,7 @@ export function NotificationBell({ className, sound }: { className?: string; sou
   return (
     <>
       <RealtimeListener onNotification={load} sound={sound} />
+      <PushRegistrar />
       <Popover onOpenChange={(o) => o && load()}>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className={cn("relative", className)} aria-label={`Notifications${unread ? ` (${unread} unread)` : ""}`}>

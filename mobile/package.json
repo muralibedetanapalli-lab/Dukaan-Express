@@ -1,0 +1,26 @@
+{
+  "name": "dukaan-mobile",
+  "private": true,
+  "description": "Capacitor Android apps (Customer + Shop Owner) that wrap the live Dukaan Express site",
+  "workspaces": ["customer", "shop"],
+  "scripts": {
+    "assets": "node scripts/make-assets.mjs",
+    "sync": "npm run sync -w customer && npm run sync -w shop",
+    "build:customer": "npm run build -w customer",
+    "build:shop": "npm run build -w shop",
+    "build": "npm run build:customer && npm run build:shop"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/push-notifications": "8.1.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "8.6.0",
+    "sharp": "^0.34.0"
+  }
+}

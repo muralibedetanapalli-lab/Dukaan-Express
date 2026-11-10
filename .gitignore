@@ -16,3 +16,11 @@ next-env.d.ts
 npm-debug.log*
 public/seed/
 scripts/dist/
+
+# Android apps
+mobile/node_modules
+mobile/dist
+mobile/*/www
+mobile/*/android/keystore.properties
+mobile/*/android/local.properties
+mobile/*/android/app/google-services.json
