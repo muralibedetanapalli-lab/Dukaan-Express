@@ -9,6 +9,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 | Super admin console | `/admin` | Platform admins |
 | Delivery & shipment management | `/admin/shipments`, the order pages, `/shop/orders/:id` | Admins and shops |
 | API docs (Swagger) | `/api-docs` | Developers |
+| Android apps | [mobile/](mobile/README.md) — *Dukaan Express* (customers) and *Dukaan Partner* (shop owners) | Phones |
 
 **Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · PostgreSQL + Prisma 7 · JWT sessions (jose) · Razorpay · Shiprocket · Google Maps · Firebase Cloud Messaging · Cloudinary · Vitest.
 
