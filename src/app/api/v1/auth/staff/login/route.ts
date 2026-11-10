@@ -1,0 +1,16 @@
+import { z } from "zod";
+import { api } from "@/server/http";
+import { staffLogin } from "@/server/services/auth";
+import { createSessionCookie } from "@/server/auth/session";
+
+export const POST = api(
+  {
+    body: z.object({ email: z.email(), password: z.string().min(1).max(200) }),
+    rateLimit: { name: "staff-login", limit: 10 },
+  },
+  async ({ body, ip }) => {
+    const user = await staffLogin(body.email, body.password, ip);
+    await createSessionCookie(user);
+    return { user: { id: user.id, name: user.name, role: user.role }, redirect: user.role === "SUPER_ADMIN" ? "/admin" : "/shop" };
+  },
+);
