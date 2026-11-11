@@ -7,9 +7,7 @@ export const POST = api(
     roles: ["CUSTOMER"],
     body: z.object({
       orderId: z.string().min(1),
-      razorpayOrderId: z.string().min(1),
-      razorpayPaymentId: z.string().optional(),
-      razorpaySignature: z.string().optional(),
+      gatewayOrderId: z.string().min(1).max(45).optional(),
       sandboxOutcome: z.enum(["success", "failure"]).optional(),
     }),
     rateLimit: { name: "pay-verify", limit: 20 },

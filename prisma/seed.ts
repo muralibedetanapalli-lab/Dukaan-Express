@@ -562,7 +562,7 @@ async function main() {
           },
           payments: {
             create: {
-              provider: cod ? "COD" : "RAZORPAY_MOCK",
+              provider: cod ? "COD" : "CASHFREE_MOCK",
               method: cod ? "COD" : "UPI",
               status: status === "DELIVERED" ? "CAPTURED" : cod ? "PENDING" : "REFUNDED",
               amount: q.total,

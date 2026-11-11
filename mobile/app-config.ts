@@ -32,8 +32,8 @@ export function appConfig(opts: {
       cleartext: server.startsWith("http://"),
       // Shown when the server can't be reached (offline / cold-start failure).
       errorPath: "offline.html",
-      // Razorpay Checkout runs inside the app; everything else (tel:, upi:, other sites) opens externally.
-      allowNavigation: ["*.razorpay.com"],
+      // Cashfree Checkout (incl. bank/3-D Secure pages) runs inside the app; everything else (tel:, upi:, other sites) opens externally.
+      allowNavigation: ["*.cashfree.com"],
     },
     android: {
       backgroundColor: "#f7faf7",

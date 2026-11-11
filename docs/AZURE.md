@@ -32,7 +32,7 @@ flowchart LR
 | Container registry | GitHub Container Registry — free |
 | Logs | Disabled below (`--logs-destination none`); live log streaming still works |
 | Database | Existing server; one more database on it costs nothing extra |
-| Outbound internet (Razorpay/Shiprocket APIs) | Default outbound — no NAT gateway needed |
+| Outbound internet (Cashfree/Shiprocket APIs) | Default outbound — no NAT gateway needed |
 
 **Set a budget alert**: Portal → Cost Management → Budgets → *Add* → ₹100/month with an email alert at 50%. You'll know immediately if anything starts costing money.
 
@@ -183,13 +183,15 @@ From now on every push to `main` runs tests, builds the image and rolls it out t
 
 ## 8. Turning on integrations (when you're ready)
 
-Add each as a secret + env var, e.g. Razorpay **test** keys (free):
+Add each as a secret + env var, e.g. Cashfree **test** keys (free):
 
 ```bash
-az containerapp secret set -g $RG -n $APP --secrets rzp-key-secret="<secret>" rzp-webhook-secret="<secret>"
-az containerapp update -g $RG -n $APP --set-env-vars RAZORPAY_KEY_ID="rzp_test_xxx" \
-  RAZORPAY_KEY_SECRET=secretref:rzp-key-secret RAZORPAY_WEBHOOK_SECRET=secretref:rzp-webhook-secret
+az containerapp secret set -g $RG -n $APP --secrets cashfree-secret-key="<secret>"
+az containerapp update -g $RG -n $APP --set-env-vars CASHFREE_APP_ID="<app id>" \
+  CASHFREE_SECRET_KEY=secretref:cashfree-secret-key CASHFREE_ENV=sandbox
 ```
+
+Switch `CASHFREE_ENV=production` (with live keys) when you go live.
 
 Same pattern for `CLOUDINARY_*` (needed for image uploads in production), `SHIPROCKET_*`, `GOOGLE_MAPS_API_KEY`, `FCM_*`, `SMS_*` — see [DEPLOYMENT.md](DEPLOYMENT.md) for where to get each value and the webhook URLs (`https://<FQDN>/api/v1/webhooks/...`).
 

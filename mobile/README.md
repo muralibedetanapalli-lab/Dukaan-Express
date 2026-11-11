@@ -79,6 +79,6 @@ Shop owners then get a loud high-priority "New order" notification even when the
 
 ## How it works
 
-- `app-config.ts` — shared Capacitor config (server URL, user agent marker, splash, offline page, Razorpay navigation).
+- `app-config.ts` — shared Capacitor config (server URL, user agent marker, splash, offline page, Cashfree checkout navigation).
 - `scripts/write-www.mjs` — generates the local `www/` loader and offline pages.
 - Website side: `src/components/shared/native-bridge.tsx` (splash hide, FCM token registration via `POST /api/v1/devices`, notification taps) and the `html[data-native]` safe-area rules in `src/app/globals.css`.

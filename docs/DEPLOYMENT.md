@@ -29,10 +29,11 @@ DATABASE_URL="postgresql://…" npm run db:seed   # optional demo data — do NO
 
 Each integration switches from its sandbox adapter to live automatically once its credentials are present. The admin header and **Settings → Integrations** show which are live.
 
-### Razorpay
-1. Dashboard → API Keys → generate live keys → `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`.
-2. Dashboard → Webhooks → URL `https://<domain>/api/v1/webhooks/razorpay`, secret → `RAZORPAY_WEBHOOK_SECRET`. Events: `payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`.
-3. Payments are verified twice: HMAC signature from Checkout **and** a server-side fetch of the payment.
+### Cashfree
+1. Dashboard → Developers → API Keys → `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`. Use test keys with `CASHFREE_ENV=sandbox`; live keys with `CASHFREE_ENV=production`.
+2. Dashboard → Developers → Webhooks → add `https://<domain>/api/v1/webhooks/cashfree` (webhook version 2025-01-01) for **Payment** (success, failed, user dropped) and **Refund** events. Signatures use your secret key, so there is no separate webhook secret. Each order also sends this URL as `notify_url` when `APP_URL` is https.
+3. Whitelist your domain in Cashfree (Developers → Whitelisting) before production; checkout from un-whitelisted domains is blocked.
+4. Payments are never confirmed from the browser: after checkout the server re-reads the order and its payments from Cashfree and checks the amount. Webhooks reach the same result independently.
 
 ### Shiprocket
 1. Create an API user (Settings → API → Configure) → `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD`.
@@ -55,6 +56,6 @@ Create a service account with the *Firebase Cloud Messaging API* role → `FCM_P
 - [ ] `JWT_SECRET` and `CRON_SECRET` are long random values, unique per environment.
 - [ ] Change all seeded passwords (or never seed production).
 - [ ] `APP_URL` uses https; cookies are `Secure` automatically in production.
-- [ ] Razorpay/Shiprocket webhook secrets configured (unsigned webhooks are rejected in live mode).
+- [ ] Cashfree webhook URL and Shiprocket webhook token configured (unsigned webhooks are rejected).
 - [ ] Database user has least privilege; backups enabled.
 - [ ] Rate limiter backed by Redis if running more than one instance.

@@ -2,7 +2,7 @@
   "name": "dukaan-express",
   "version": "1.0.0",
   "private": true,
-  "description": "Multi-vendor instant delivery marketplace (Admin, Shop Owner, Customer apps + Shiprocket/Razorpay integrations)",
+  "description": "Multi-vendor instant delivery marketplace (Admin, Shop Owner, Customer apps + Shiprocket/Cashfree integrations)",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

@@ -1,16 +1,19 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/server/db";
+import { env } from "@/server/env";
 import { AppError, badRequest, conflict, notFound } from "@/server/errors";
 import {
-  createRazorpayOrder,
-  createRefund,
-  fetchPayment,
-  isRazorpayLive,
-  publicRazorpayKey,
-  verifyCheckoutSignature,
-  verifyWebhookSignature,
-} from "@/server/integrations/razorpay";
+  cashfreeEnv,
+  createCashfreeOrder,
+  createCashfreeRefund,
+  fetchCashfreeOrder,
+  fetchCashfreePayments,
+  fetchCashfreeRefund,
+  isCashfreeLive,
+  toPaise,
+  verifyCashfreeWebhook,
+} from "@/server/integrations/cashfree";
 import type { Prisma } from "@/generated/prisma/client";
 import { formatINR } from "@/lib/money";
 import { audit } from "./audit";
@@ -18,84 +21,150 @@ import { notifyAdmins, notifyCustomer } from "./notification";
 import { getSettings } from "./settings";
 import type { OrderActor } from "./order";
 
-const PAYMENT_METHOD_MAP: Record<string, string> = { UPI: "upi", CARD: "card", NETBANKING: "netbanking" };
+/** Sandbox payments (CASHFREE_MOCK, or legacy RAZORPAY_MOCK seed data) never touch the real gateway. */
+const isMockPayment = (p: { provider: string }) => p.provider.endsWith("_MOCK");
 
-/** Returns everything the browser needs to open Razorpay Checkout (or the sandbox checkout). */
-export async function startPayment(orderId: string, customerId: string) {
+export interface CheckoutOptions {
+  /** "live" opens Cashfree Checkout; "sandbox" opens the in-app simulated gateway. */
+  mode: "live" | "sandbox";
+  cashfreeMode: "sandbox" | "production";
+  paymentSessionId: string;
+  gatewayOrderId: string;
+  amount: number;
+  currency: "INR";
+  orderNumber: string;
+  name: string;
+}
+
+/** Create (or reuse) the Cashfree order for a PAYMENT_PENDING order and return what the browser needs to open checkout. */
+export async function startPayment(orderId: string, customerId: string): Promise<CheckoutOptions> {
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: { payments: { orderBy: { createdAt: "desc" } }, customer: { include: { user: true } } },
   });
   if (!order || order.customerId !== customerId) throw notFound("Order");
   if (order.status !== "PAYMENT_PENDING") throw conflict("This order does not need payment");
-  let payment = order.payments.find((p) => p.status === "PENDING" || p.status === "FAILED");
-  if (!payment || payment.status === "FAILED") {
-    payment = await db.payment.create({
-      data: {
-        orderId,
-        provider: isRazorpayLive() ? "RAZORPAY" : "RAZORPAY_MOCK",
-        method: order.paymentMethod,
-        amount: order.total,
-      },
-    });
-  }
-  if (!payment.providerOrderId) {
-    const rzp = await createRazorpayOrder(order.total, `${order.orderNumber}-${randomBytes(2).toString("hex")}`, { orderId });
-    payment = await db.payment.update({ where: { id: payment.id }, data: { providerOrderId: rzp.id } });
-  }
+  const live = isCashfreeLive();
   const settings = await getSettings();
-  return {
-    mode: isRazorpayLive() ? "live" : "sandbox",
-    keyId: publicRazorpayKey(),
-    razorpayOrderId: payment.providerOrderId!,
+  const options = (gatewayOrderId: string, paymentSessionId: string): CheckoutOptions => ({
+    mode: live ? "live" : "sandbox",
+    cashfreeMode: cashfreeEnv(),
+    paymentSessionId,
+    gatewayOrderId,
     amount: order.total,
     currency: "INR",
     orderNumber: order.orderNumber,
     name: settings.platform.name,
-    preferredMethod: PAYMENT_METHOD_MAP[order.paymentMethod] ?? null,
-    prefill: { name: order.customer.user.name ?? "", contact: order.customer.user.phone ?? "", email: order.customer.user.email ?? "" },
-  };
+  });
+
+  let payment = order.payments.find((p) => p.status === "PENDING") ?? null;
+  // Reuse a still-open gateway order so re-opening checkout never creates a second chargeable order.
+  if (payment?.providerOrderId) {
+    const sameMode = live !== isMockPayment(payment);
+    if (sameMode && !live) return options(payment.providerOrderId, "session_MOCK");
+    if (sameMode && live) {
+      const cf = await fetchCashfreeOrder(payment.providerOrderId).catch(() => null);
+      if (cf?.order_status === "PAID") {
+        await syncPaymentFromGateway(payment.id);
+        throw conflict("This order is already paid");
+      }
+      if (cf?.order_status === "ACTIVE") return options(payment.providerOrderId, cf.payment_session_id);
+    }
+    await db.payment.update({ where: { id: payment.id }, data: { status: "FAILED", failureReason: "Payment session expired" } });
+    payment = null;
+  }
+  if (!payment) {
+    payment = await db.payment.create({
+      data: { orderId, provider: live ? "CASHFREE" : "CASHFREE_MOCK", method: order.paymentMethod, amount: order.total },
+    });
+  } else if (payment.provider !== (live ? "CASHFREE" : "CASHFREE_MOCK")) {
+    payment = await db.payment.update({ where: { id: payment.id }, data: { provider: live ? "CASHFREE" : "CASHFREE_MOCK" } });
+  }
+
+  const appUrl = env().APP_URL.replace(/\/$/, "");
+  // 3–45 chars of [A-Za-z0-9_-]; the random suffix makes each attempt a fresh gateway order.
+  const gatewayOrderId = `${live ? "" : "MOCK_"}${order.orderNumber}_${randomBytes(3).toString("hex")}`;
+  const user = order.customer.user;
+  const cf = await createCashfreeOrder({
+    orderId: gatewayOrderId,
+    amountPaise: order.total,
+    customer: { id: order.customerId, phone: user.phone ?? "", name: user.name, email: user.email },
+    returnUrl: `${appUrl}/orders/${order.id}?payment=return`,
+    notifyUrl: appUrl.startsWith("https://") ? `${appUrl}/api/v1/webhooks/cashfree` : undefined,
+    note: `Order ${order.orderNumber}`,
+  });
+  await db.payment.update({ where: { id: payment.id }, data: { providerOrderId: gatewayOrderId } });
+  return options(gatewayOrderId, cf.payment_session_id);
+}
+
+export type PaymentOutcome = "paid" | "failed" | "pending";
+
+/**
+ * Asks Cashfree for the real state of a payment (never trusts the browser) and records it.
+ * Safe to call repeatedly; webhooks reach the same end state independently.
+ */
+export async function syncPaymentFromGateway(paymentId: string): Promise<PaymentOutcome> {
+  const payment = await db.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  if (payment.status === "CAPTURED" || payment.status === "REFUNDED" || payment.status === "PARTIALLY_REFUNDED") return "paid";
+  if (!payment.providerOrderId) return "pending";
+  const cf = await fetchCashfreeOrder(payment.providerOrderId);
+  if (toPaise(cf.order_amount) !== payment.amount) {
+    await markPaymentFailed(payment.id, "Gateway amount does not match order");
+    throw new AppError(400, "PAYMENT_MISMATCH", "Payment does not match this order");
+  }
+  const attempts = await fetchCashfreePayments(payment.providerOrderId);
+  if (cf.order_status === "PAID") {
+    const ok = attempts.find((a) => a.payment_status === "SUCCESS");
+    await markPaymentCaptured(payment.id, String(ok?.cf_payment_id ?? cf.cf_order_id), ok?.payment_group ?? null, {
+      order: cf,
+      payment: ok ?? null,
+    } as unknown as Prisma.InputJsonValue);
+    return "paid";
+  }
+  if (attempts.some((a) => a.payment_status === "PENDING")) return "pending";
+  const failed = attempts.find((a) => a.payment_status === "FAILED");
+  if (failed) {
+    await markPaymentFailed(payment.id, failed.payment_message ?? "Payment failed");
+    return "failed";
+  }
+  return "pending"; // not attempted, or the customer closed checkout
 }
 
 export interface VerifyInput {
   orderId: string;
-  razorpayOrderId: string;
-  razorpayPaymentId?: string;
-  razorpaySignature?: string;
+  gatewayOrderId?: string;
   /** sandbox only */
   sandboxOutcome?: "success" | "failure";
 }
 
+/** Called by the browser after checkout closes (or on return from the gateway). Status always comes from the server/gateway. */
 export async function verifyPayment(customerId: string, input: VerifyInput) {
-  const payment = await db.payment.findUnique({ where: { providerOrderId: input.razorpayOrderId }, include: { order: true } });
-  if (!payment || payment.orderId !== input.orderId || payment.order.customerId !== customerId) throw notFound("Payment");
+  const order = await db.order.findUnique({ where: { id: input.orderId }, include: { payments: { orderBy: { createdAt: "desc" } } } });
+  if (!order || order.customerId !== customerId) throw notFound("Order");
+  const payment = input.gatewayOrderId
+    ? order.payments.find((p) => p.providerOrderId === input.gatewayOrderId)
+    : order.payments.find((p) => p.provider !== "COD" && p.providerOrderId);
+  if (!payment) throw notFound("Payment");
 
-  if (isRazorpayLive()) {
-    if (!input.razorpayPaymentId || !input.razorpaySignature) throw badRequest("Missing payment details");
-    if (!verifyCheckoutSignature(input.razorpayOrderId, input.razorpayPaymentId, input.razorpaySignature)) {
-      await markPaymentFailed(payment.id, "Signature verification failed");
-      throw new AppError(400, "SIGNATURE_INVALID", "Payment verification failed");
-    }
-    // Defence in depth: confirm with Razorpay that the payment is really captured/authorized.
-    const remote = await fetchPayment(input.razorpayPaymentId);
-    if (remote.order_id !== input.razorpayOrderId || remote.amount !== payment.amount) {
-      await markPaymentFailed(payment.id, "Payment does not match order");
-      throw new AppError(400, "PAYMENT_MISMATCH", "Payment does not match this order");
-    }
-    if (remote.status === "failed") {
-      await markPaymentFailed(payment.id, remote.error_description ?? "Payment failed");
-      throw new AppError(402, "PAYMENT_FAILED", "Payment failed");
-    }
-    await markPaymentCaptured(payment.id, input.razorpayPaymentId, remote.method, remote as unknown as Prisma.InputJsonValue);
+  let outcome: PaymentOutcome;
+  if (!isMockPayment(payment)) {
+    outcome = await syncPaymentFromGateway(payment.id);
+  } else if (payment.status === "CAPTURED") {
+    outcome = "paid";
+  } else if (!input.sandboxOutcome) {
+    outcome = "pending";
   } else {
-    if (payment.provider !== "RAZORPAY_MOCK") throw badRequest("Invalid sandbox payment");
+    if (isCashfreeLive()) throw badRequest("Sandbox payments are disabled");
     if (input.sandboxOutcome === "failure") {
       await markPaymentFailed(payment.id, "Sandbox: payment declined by tester");
-      throw new AppError(402, "PAYMENT_FAILED", "Payment failed (sandbox)");
+      outcome = "failed";
+    } else {
+      await markPaymentCaptured(payment.id, `cf_MOCK${randomBytes(6).toString("hex")}`, "upi", { sandbox: true });
+      outcome = "paid";
     }
-    await markPaymentCaptured(payment.id, `pay_MOCK${randomBytes(7).toString("hex")}`, PAYMENT_METHOD_MAP[payment.method] ?? "upi", { sandbox: true });
   }
-  return db.order.findUniqueOrThrow({ where: { id: payment.orderId }, select: { id: true, status: true, paymentStatus: true } });
+  const o = await db.order.findUniqueOrThrow({ where: { id: order.id }, select: { id: true, status: true, paymentStatus: true } });
+  return { ...o, outcome };
 }
 
 /** Idempotent: safe to call from both the checkout callback and the webhook. */
@@ -149,7 +218,7 @@ export async function initiateRefund(
   const order = await db.order.findUnique({ where: { id: orderId }, include: { payments: true, refunds: true } });
   if (!order) throw notFound("Order");
   const payment = order.payments.find((p) => p.status === "CAPTURED" || p.status === "PARTIALLY_REFUNDED");
-  if (!payment || payment.provider === "COD" || !payment.providerPaymentId) throw badRequest("No online payment to refund");
+  if (!payment || payment.provider === "COD" || !payment.providerOrderId) throw badRequest("No online payment to refund");
   const alreadyRefunded = order.refunds.filter((r) => r.status !== "FAILED").reduce((s, r) => s + r.amount, 0);
   const refundable = payment.amount - alreadyRefunded;
   if (opts.amount <= 0 || opts.amount > refundable) throw badRequest(`Refund amount must be between ₹0.01 and ${formatINR(refundable)}`);
@@ -164,9 +233,13 @@ export async function initiateRefund(
     });
   }
   try {
-    const r = await createRefund(payment.providerPaymentId, opts.amount, { orderId, refundId: refund.id });
-    await db.refund.update({ where: { id: refund.id }, data: { providerRefundId: r.id } });
-    if (r.status === "processed") await markRefundProcessed(r.id);
+    // Our refund id is Cashfree's refund_id (and idempotency key); webhooks report back with it.
+    await db.refund.update({ where: { id: refund.id }, data: { providerRefundId: refund.id } });
+    const r = await createCashfreeRefund(payment.providerOrderId, refund.id, opts.amount, opts.reason, isMockPayment(payment));
+    if (r.refund_status === "SUCCESS") await markRefundProcessed(refund.id);
+    else if (r.refund_status === "CANCELLED" || r.refund_status === "REJECTED") {
+      throw new AppError(502, "REFUND_FAILED", r.status_description ?? "Refund was rejected by Cashfree");
+    }
   } catch (e) {
     await db.refund.update({ where: { id: refund.id }, data: { status: "FAILED", failureReason: (e as Error).message } });
     throw e;
@@ -203,51 +276,73 @@ export async function markRefundProcessed(providerRefundId: string) {
 
 // ───────────────────────────── Webhook ─────────────────────────────
 
-interface RzpWebhook {
-  event: string;
-  payload: {
-    payment?: { entity: { id: string; order_id: string; method?: string; error_description?: string } };
-    refund?: { entity: { id: string; payment_id: string; status: string } };
+interface CfWebhook {
+  type: string;
+  event_time?: string;
+  data?: {
+    order?: { order_id: string; order_amount?: number };
+    payment?: {
+      cf_payment_id: string | number;
+      payment_status: string;
+      payment_amount?: number;
+      payment_group?: string | null;
+      payment_message?: string | null;
+    };
+    refund?: { cf_refund_id: string | number; refund_id: string; order_id: string; refund_status: string; status_description?: string };
   };
 }
 
-export async function handleRazorpayWebhook(rawBody: string, signature: string | null, eventIdHeader: string | null) {
-  const valid = verifyWebhookSignature(rawBody, signature);
-  let body: RzpWebhook;
+/** Cashfree Dashboard → Developers → Webhooks: payment success / failed / user dropped, and refund status. */
+export async function handleCashfreeWebhook(rawBody: string, signature: string | null, timestamp: string | null, idempotencyKey: string | null) {
+  const valid = verifyCashfreeWebhook(rawBody, signature, timestamp);
+  let body: CfWebhook;
   try {
     body = JSON.parse(rawBody);
   } catch {
     throw badRequest("Invalid JSON");
   }
-  const eventId = eventIdHeader ?? createHash("sha256").update(rawBody).digest("hex");
-  const existing = await db.webhookEvent.findUnique({ where: { provider_eventId: { provider: "RAZORPAY", eventId } } });
+  const eventId = idempotencyKey ?? createHash("sha256").update(rawBody).digest("hex");
+  const existing = await db.webhookEvent.findUnique({ where: { provider_eventId: { provider: "CASHFREE", eventId } } });
   if (existing?.processedAt) return { duplicate: true };
   const ev =
     existing ??
     (await db.webhookEvent.create({
-      data: { provider: "RAZORPAY", eventId, eventType: body.event ?? "unknown", payload: body as unknown as Prisma.InputJsonValue, signatureValid: valid },
+      data: { provider: "CASHFREE", eventId, eventType: body.type ?? "unknown", payload: body as unknown as Prisma.InputJsonValue, signatureValid: valid },
     }));
   if (!valid) {
     await db.webhookEvent.update({ where: { id: ev.id }, data: { error: "Invalid signature" } });
     throw new AppError(401, "INVALID_SIGNATURE", "Invalid webhook signature");
   }
   try {
-    const pay = body.payload.payment?.entity;
-    if ((body.event === "payment.captured" || body.event === "order.paid") && pay) {
-      const p = await db.payment.findUnique({ where: { providerOrderId: pay.order_id } });
-      if (p) await markPaymentCaptured(p.id, pay.id, pay.method ?? null, body as unknown as Prisma.InputJsonValue);
-    } else if (body.event === "payment.failed" && pay) {
-      const p = await db.payment.findUnique({ where: { providerOrderId: pay.order_id } });
-      if (p) await markPaymentFailed(p.id, pay.error_description ?? "Payment failed");
-    } else if (body.event === "refund.processed" && body.payload.refund) {
-      await markRefundProcessed(body.payload.refund.entity.id);
-    } else if (body.event === "refund.failed" && body.payload.refund) {
-      await db.refund.updateMany({
-        where: { providerRefundId: body.payload.refund.entity.id },
-        data: { status: "FAILED", failureReason: "Refund failed at Razorpay" },
-      });
-      await notifyAdmins({ type: "REFUND", title: "Refund failed", body: `Razorpay refund ${body.payload.refund.entity.id} failed`, link: "/admin/orders?status=REFUND_PENDING" });
+    const gatewayOrderId = body.data?.order?.order_id;
+    const pay = body.data?.payment;
+    if (body.type === "PAYMENT_SUCCESS_WEBHOOK" && gatewayOrderId && pay) {
+      const p = await db.payment.findUnique({ where: { providerOrderId: gatewayOrderId } });
+      if (p) {
+        if (pay.payment_amount !== undefined && toPaise(pay.payment_amount) !== p.amount) throw new Error(`Amount mismatch for ${gatewayOrderId}`);
+        await markPaymentCaptured(p.id, String(pay.cf_payment_id), pay.payment_group ?? null, body as unknown as Prisma.InputJsonValue);
+      }
+    } else if (body.type === "PAYMENT_FAILED_WEBHOOK" && gatewayOrderId && pay) {
+      const p = await db.payment.findUnique({ where: { providerOrderId: gatewayOrderId } });
+      if (p) await markPaymentFailed(p.id, pay.payment_message ?? "Payment failed");
+    } else if (body.type === "REFUND_STATUS_WEBHOOK" && body.data?.refund) {
+      const r = body.data.refund;
+      if (r.refund_status === "SUCCESS") {
+        await markRefundProcessed(r.refund_id);
+      } else if (r.refund_status === "CANCELLED" || r.refund_status === "REJECTED") {
+        await db.refund.updateMany({
+          where: { providerRefundId: r.refund_id, status: { in: ["PENDING", "PROCESSING"] } },
+          data: { status: "FAILED", failureReason: r.status_description ?? `Refund ${r.refund_status.toLowerCase()} at Cashfree` },
+        });
+        await notifyAdmins({
+          type: "REFUND",
+          title: "Refund failed",
+          body: `Cashfree refund ${r.refund_id} was ${r.refund_status.toLowerCase()}`,
+          link: "/admin/orders?status=REFUND_PENDING",
+        });
+      }
     }
+    // PAYMENT_USER_DROPPED_WEBHOOK and auto-refund events are recorded but need no action.
     await db.webhookEvent.update({ where: { id: ev.id }, data: { processedAt: new Date(), attempts: { increment: 1 }, error: null } });
   } catch (e) {
     await db.webhookEvent.update({ where: { id: ev.id }, data: { attempts: { increment: 1 }, error: (e as Error).message } });
@@ -261,13 +356,56 @@ export async function expireUnpaidOrders() {
   const { transitionOrder, SYSTEM } = await import("./order");
   const settings = await getSettings();
   const cutoff = new Date(Date.now() - settings.order.paymentTimeoutMinutes * 60_000);
-  const stale = await db.order.findMany({ where: { status: "PAYMENT_PENDING", createdAt: { lt: cutoff } }, select: { id: true } });
+  const stale = await db.order.findMany({
+    where: { status: "PAYMENT_PENDING", createdAt: { lt: cutoff } },
+    select: { id: true, payments: { where: { status: "PENDING", providerOrderId: { not: null } } } },
+  });
+  let expired = 0;
   for (const o of stale) {
     try {
+      // A webhook may have been missed: ask Cashfree before cancelling an order the customer actually paid.
+      let paid = false;
+      for (const p of o.payments) {
+        if (!isMockPayment(p) && isCashfreeLive()) paid ||= (await syncPaymentFromGateway(p.id)) === "paid";
+      }
+      if (paid) continue;
       await transitionOrder(o.id, "CANCELLED", SYSTEM, { remarks: "Payment not completed in time", data: { cancelReason: "Payment timeout", cancelledBy: "SYSTEM" } });
+      expired++;
     } catch (e) {
       console.warn("[payment] expire failed", o.id, e);
     }
   }
-  return stale.length;
+  return expired;
+}
+
+/** Re-checks refunds still in flight at Cashfree (safety net for missed webhooks). Called by the maintenance cron. */
+export async function reconcileRefunds() {
+  if (!isCashfreeLive()) return 0;
+  const pending = await db.refund.findMany({
+    where: {
+      status: { in: ["PENDING", "PROCESSING"] },
+      providerRefundId: { not: null },
+      createdAt: { lt: new Date(Date.now() - 5 * 60_000) },
+      payment: { provider: "CASHFREE", providerOrderId: { not: null } },
+    },
+    include: { payment: true },
+    take: 50,
+  });
+  let settled = 0;
+  for (const r of pending) {
+    try {
+      const remote = await fetchCashfreeRefund(r.payment!.providerOrderId!, r.providerRefundId!);
+      if (remote.refund_status === "SUCCESS") {
+        await markRefundProcessed(r.providerRefundId!);
+        settled++;
+      } else if (remote.refund_status === "CANCELLED" || remote.refund_status === "REJECTED") {
+        await db.refund.update({ where: { id: r.id }, data: { status: "FAILED", failureReason: remote.status_description ?? `Refund ${remote.refund_status.toLowerCase()}` } });
+        await notifyAdmins({ type: "REFUND", title: "Refund failed", body: `Cashfree refund ${r.providerRefundId} was ${remote.refund_status.toLowerCase()}`, link: "/admin/orders?status=REFUND_PENDING" });
+        settled++;
+      }
+    } catch (e) {
+      console.warn("[payment] refund reconcile failed", r.id, e);
+    }
+  }
+  return settled;
 }

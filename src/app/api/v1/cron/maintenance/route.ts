@@ -4,7 +4,7 @@ import { db } from "@/server/db";
 import { errorResponse } from "@/server/http";
 import { unauthorized } from "@/server/errors";
 import { safeEqual } from "@/server/auth/password";
-import { expireUnpaidOrders } from "@/server/services/payment";
+import { expireUnpaidOrders, reconcileRefunds } from "@/server/services/payment";
 import { transitionOrder, SYSTEM } from "@/server/services/order";
 import { getSettings } from "@/server/services/settings";
 import { createShipmentForOrder } from "@/server/services/shipment";
@@ -12,7 +12,8 @@ import { createShipmentForOrder } from "@/server/services/shipment";
 export const runtime = "nodejs";
 
 /**
- * Periodic maintenance (Vercel Cron, every 5 min): expire unpaid orders, auto-reject orders a shop
+ * Periodic maintenance (Azure Container Apps job, every 15 min): expire unpaid orders (after re-checking
+ * Cashfree), settle refunds whose webhook was missed, auto-reject orders a shop
  * ignored, reconcile shipments stuck in SHIPMENT_CREATING, and prune old OTPs / idempotency keys.
  * Protected by `Authorization: Bearer ${CRON_SECRET}`.
  */
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
 
     const settings = await getSettings(true);
     const expired = await expireUnpaidOrders();
+    const refundsSettled = await reconcileRefunds();
 
     const acceptCutoff = new Date(Date.now() - settings.order.shopAcceptTimeoutMinutes * 60_000);
     const ignored = await db.order.findMany({ where: { status: "SHOP_PENDING", updatedAt: { lt: acceptCutoff } }, select: { id: true } });
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest) {
       db.otp.deleteMany({ where: { createdAt: { lt: day } } }),
       db.idempotencyKey.deleteMany({ where: { createdAt: { lt: day } } }),
     ]);
-    return NextResponse.json({ data: { expired, autoRejected: ignored.length, reconciled: stuck.length, prunedOtps: otps.count, prunedKeys: keys.count } });
+    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, reconciled: stuck.length, prunedOtps: otps.count, prunedKeys: keys.count } });
   } catch (e) {
     return errorResponse(e);
   }

@@ -626,14 +626,14 @@ model Payment {
   id                String        @id @default(cuid())
   orderId           String
   order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider          String // RAZORPAY | RAZORPAY_MOCK | COD
+  provider          String // CASHFREE | CASHFREE_MOCK | COD
   method            PaymentMethod
   status            PaymentStatus @default(PENDING)
   amount            Int
   currency          String        @default("INR")
   providerOrderId   String?       @unique
   providerPaymentId String?       @unique
-  providerMethod    String? // upi | card | netbanking (as reported by Razorpay)
+  providerMethod    String? // payment group as reported by Cashfree (upi, credit_card, net_banking, …)
   failureReason     String?
   raw               Json?
   capturedAt        DateTime?
@@ -891,7 +891,7 @@ model AuditLog {
 
 model WebhookEvent {
   id             String    @id @default(cuid())
-  provider       String // RAZORPAY | SHIPROCKET
+  provider       String // CASHFREE | SHIPROCKET
   eventId        String
   eventType      String
   payload        Json

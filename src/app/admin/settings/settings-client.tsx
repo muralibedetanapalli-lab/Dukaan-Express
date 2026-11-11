@@ -81,7 +81,7 @@ const GROUPS: { key: string; label: string; fields: Field[] }[] = [
     key: "payments",
     label: "Payments",
     fields: [
-      { key: "onlineEnabled", label: "Online payments (Razorpay)", kind: "bool" },
+      { key: "onlineEnabled", label: "Online payments (Cashfree)", kind: "bool" },
       { key: "upi", label: "UPI", kind: "bool" },
       { key: "card", label: "Credit / debit cards", kind: "bool" },
       { key: "netbanking", label: "Net banking", kind: "bool" },
@@ -172,7 +172,7 @@ export function SettingsClient({ settings, integrations, areas }: { settings: Se
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">Webhook URLs: /api/v1/webhooks/razorpay · /api/v1/webhooks/shiprocket (alias /api/v1/webhooks/courier)</p>
+          <p className="text-xs text-muted-foreground">Webhook URLs: /api/v1/webhooks/cashfree · /api/v1/webhooks/shiprocket (alias /api/v1/webhooks/courier)</p>
         </Card>
       </TabsContent>
     </Tabs>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, HelpCircle, Loader2, RotateCcw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmButton } from "@/components/shared/confirm-button";
-import { usePayment } from "@/components/customer/payment";
+import { confirmPayment, usePayment } from "@/components/customer/payment";
 import { useCart } from "@/components/customer/cart-context";
 import { api, errorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,22 @@ export function OrderActions({
   const { refresh } = useCart();
   const { pay, dialog } = usePayment();
   const [paying, setPaying] = useState(false);
+  const searchParams = useSearchParams();
+  const returned = searchParams.get("payment") === "return";
+  const confirmedReturn = useRef(false);
+
+  // Back from Cashfree's hosted page (redirect flow): confirm the result with the server once.
+  useEffect(() => {
+    if (!returned || confirmedReturn.current) return;
+    confirmedReturn.current = true;
+    confirmPayment(orderId)
+      .then((r) => {
+        if (r === "paid") toast.success("Payment successful");
+        else if (r === "failed") toast.error("Payment failed. You can try again.");
+      })
+      .catch((e) => toast.error(errorMessage(e)))
+      .finally(() => router.replace(`/orders/${orderId}`));
+  }, [returned, orderId, router]);
   const [reordering, setReordering] = useState(false);
   const [review, setReview] = useState(false);
   const [support, setSupport] = useState(false);

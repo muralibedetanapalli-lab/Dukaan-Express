@@ -14,7 +14,7 @@ import { getSettings } from "./settings";
 import { audit } from "./audit";
 import { notifyAdmins, notifyCustomer, notifyShop, signalUsers, shopOwnerUserIds, customerUserId, adminUserIds } from "./notification";
 import { initiateRefund } from "./payment";
-import { createRazorpayOrder, isRazorpayLive } from "@/server/integrations/razorpay";
+import { isCashfreeLive } from "@/server/integrations/cashfree";
 
 export interface OrderActor {
   id: string | null;
@@ -190,7 +190,7 @@ export async function placeOrder(customer: { userId: string; customerId: string 
         },
         payments: {
           create: {
-            provider: isCod ? "COD" : isRazorpayLive() ? "RAZORPAY" : "RAZORPAY_MOCK",
+            provider: isCod ? "COD" : isCashfreeLive() ? "CASHFREE" : "CASHFREE_MOCK",
             method: input.paymentMethod,
             status: "PENDING",
             amount: quote.total,
@@ -224,17 +224,8 @@ export async function placeOrder(customer: { userId: string; customerId: string 
   });
   void checkLowStock(order.id);
 
-  if (isCod) {
-    await announceNewOrder(order.id);
-  } else {
-    // Razorpay order is created outside the DB transaction; failures leave the order retryable.
-    try {
-      const rzp = await createRazorpayOrder(order.total, order.orderNumber, { orderId: order.id });
-      await db.payment.updateMany({ where: { orderId: order.id, status: "PENDING" }, data: { providerOrderId: rzp.id } });
-    } catch (e) {
-      console.error("[order] razorpay order creation failed; customer can retry payment", e);
-    }
-  }
+  // Online orders get their Cashfree order when the customer opens checkout (POST /orders/{id}/pay).
+  if (isCod) await announceNewOrder(order.id);
   return db.order.findUniqueOrThrow({ where: { id: order.id }, include: { payments: true } });
 }
 

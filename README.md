@@ -1,6 +1,6 @@
 # Dukaan Express
 
-A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop owners manage their own inventory and orders, and customers order from shops that deliver to their location. Shipping runs through Shiprocket and payments through Razorpay.
+A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop owners manage their own inventory and orders, and customers order from shops that deliver to their location. Shipping runs through Shiprocket and payments through Cashfree.
 
 | Interface | URL | Who |
 |---|---|---|
@@ -11,7 +11,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 | API docs (Swagger) | `/api-docs` | Developers |
 | Android apps | [mobile/](mobile/README.md) — *Dukaan Express* (customers) and *Dukaan Partner* (shop owners) | Phones |
 
-**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · PostgreSQL + Prisma 7 · JWT sessions (jose) · Razorpay · Shiprocket · Google Maps · Firebase Cloud Messaging · Cloudinary · Vitest.
+**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · PostgreSQL + Prisma 7 · JWT sessions (jose) · Cashfree · Shiprocket · Google Maps · Firebase Cloud Messaging · Cloudinary · Vitest.
 
 ## Documentation
 
@@ -72,7 +72,7 @@ The seed creates 7 Bengaluru shops (one awaiting approval), 9 categories, 60 pro
 
 Every third-party integration uses an isolated sandbox adapter until you add its credentials. The admin header lists the sandbox adapters that are active. Sandbox adapters never pretend to be the real provider: their ids are prefixed `MOCK-` / `order_MOCK`.
 
-- **Razorpay sandbox:** the checkout opens a sandbox dialog with "Simulate success" and "Simulate failure".
+- **Payment sandbox:** without Cashfree keys, the checkout opens a sandbox dialog with "Simulate success" and "Simulate failure".
 - **Shiprocket sandbox:** serviceability, order creation, AWB, pickup and label are simulated. A **"Simulate next courier update"** button on shop and admin order pages sends courier events through the *same webhook pipeline* Shiprocket uses, so you can follow an order all the way to Delivered.
   - Delivery pincode ending in `999`: no courier available, so you can exercise the shipment-exception and retry flow.
   - Delivery pincode ending in `998`: the create call times out once, so you can exercise the idempotent reconciliation.
@@ -126,7 +126,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
   - Shiprocket no-courier exception and retry
   - timeout reconciliation without duplicate shipments
   - webhook de-duplication
-  - Razorpay webhook signatures
+  - Cashfree webhook signatures
   - payment retry after failure
   - OTP brute-force and reuse protection
   - staff login status checks
@@ -139,6 +139,6 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 - **Passwords and OTPs:** passwords use bcrypt (cost 12). OTPs are stored hashed, expire after 5 minutes, and are limited by attempts and send rate.
 - **Sessions:** httpOnly SameSite cookies; deactivating a user or resetting a password revokes all their sessions.
 - **Input checks:** zod validation on every endpoint, uploads checked by magic bytes, and spreadsheet-injection-safe CSV exports.
-- **Webhooks:** Razorpay webhooks are HMAC-verified; Shiprocket webhooks are checked by token. Every inbound event is recorded and de-duplicated.
+- **Webhooks:** Cashfree webhooks are HMAC-verified; Shiprocket webhooks are checked by token. Every inbound event is recorded and de-duplicated.
 - **Idempotency:** order placement takes an idempotency key; Shiprocket order creation is reconciled on retry so it is never duplicated.
 - **Audit trail:** admin and shop changes and every order transition are logged.

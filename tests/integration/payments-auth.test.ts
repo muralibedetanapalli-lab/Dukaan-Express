@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { handleRazorpayWebhook, verifyPayment, startPayment } from "@/server/services/payment";
+import { handleCashfreeWebhook, verifyPayment, startPayment } from "@/server/services/payment";
 import { requestOtp, verifyOtpAndLogin, staffLogin } from "@/server/services/auth";
 import { hashPassword } from "@/server/auth/password";
 import { signSession, verifySession } from "@/server/auth/jwt";
@@ -9,29 +9,62 @@ import { addToCart } from "@/server/services/cart";
 import { placeOrder } from "@/server/services/order";
 import { fixture, resetDb } from "./helpers";
 
-describe("Razorpay webhooks", () => {
+const sign = (ts: string, body: string) => createHmac("sha256", "test-webhook-secret").update(ts + body).digest("base64");
+
+describe("Cashfree payments & webhooks", () => {
   beforeEach(resetDb);
 
   it("rejects webhooks with an invalid signature and records them", async () => {
-    const body = JSON.stringify({ event: "payment.captured", payload: {} });
-    await expect(handleRazorpayWebhook(body, "bad-signature", "evt_1")).rejects.toMatchObject({ status: 401 });
+    const body = JSON.stringify({ type: "PAYMENT_SUCCESS_WEBHOOK", data: {} });
+    await expect(handleCashfreeWebhook(body, "bad-signature", "1731300000", "evt_1")).rejects.toMatchObject({ status: 401 });
     const ev = await db.webhookEvent.findFirstOrThrow({ where: { eventId: "evt_1" } });
     expect(ev.signatureValid).toBe(false);
+    expect(ev.provider).toBe("CASHFREE");
   });
 
   it("captures a payment from a signed webhook exactly once", async () => {
     const f = await fixture();
     await addToCart(f.customer.customerId, f.inv1.id, 1, false);
     const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "CARD" });
-    const { razorpayOrderId } = await startPayment(order.id, f.customer.customerId);
-    const body = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_TEST1", order_id: razorpayOrderId, method: "card" } } } });
-    const sig = createHmac("sha256", "test-webhook-secret").update(body).digest("hex");
-    await handleRazorpayWebhook(body, sig, "evt_cap");
-    const again = await handleRazorpayWebhook(body, sig, "evt_cap");
+    const { gatewayOrderId, amount } = await startPayment(order.id, f.customer.customerId);
+    const body = JSON.stringify({
+      type: "PAYMENT_SUCCESS_WEBHOOK",
+      data: {
+        order: { order_id: gatewayOrderId, order_amount: amount / 100 },
+        payment: { cf_payment_id: 5114910000001, payment_status: "SUCCESS", payment_amount: amount / 100, payment_group: "credit_card" },
+      },
+    });
+    const ts = "1731300000";
+    await handleCashfreeWebhook(body, sign(ts, body), ts, null);
+    const again = await handleCashfreeWebhook(body, sign(ts, body), ts, null);
     expect(again).toMatchObject({ duplicate: true });
-    const o = await db.order.findUniqueOrThrow({ where: { id: order.id } });
+    const o = await db.order.findUniqueOrThrow({ where: { id: order.id }, include: { payments: true } });
     expect(o.paymentStatus).toBe("CAPTURED");
     expect(o.status).toBe("SHOP_PENDING");
+    expect(o.payments[0].providerPaymentId).toBe("5114910000001");
+  });
+
+  it("refuses a webhook whose amount does not match the order", async () => {
+    const f = await fixture();
+    await addToCart(f.customer.customerId, f.inv1.id, 1, false);
+    const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "UPI" });
+    const { gatewayOrderId } = await startPayment(order.id, f.customer.customerId);
+    const body = JSON.stringify({
+      type: "PAYMENT_SUCCESS_WEBHOOK",
+      data: { order: { order_id: gatewayOrderId }, payment: { cf_payment_id: 1, payment_status: "SUCCESS", payment_amount: 1 } },
+    });
+    await expect(handleCashfreeWebhook(body, sign("1", body), "1", null)).rejects.toThrow(/Amount mismatch/);
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("PAYMENT_PENDING");
+  });
+
+  it("re-opening checkout reuses the open gateway order", async () => {
+    const f = await fixture();
+    await addToCart(f.customer.customerId, f.inv1.id, 1, false);
+    const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "UPI" });
+    const a = await startPayment(order.id, f.customer.customerId);
+    const b = await startPayment(order.id, f.customer.customerId);
+    expect(b.gatewayOrderId).toBe(a.gatewayOrderId);
+    expect(await db.payment.count({ where: { orderId: order.id } })).toBe(1);
   });
 
   it("a failed sandbox payment keeps the order retryable", async () => {
@@ -39,10 +72,12 @@ describe("Razorpay webhooks", () => {
     await addToCart(f.customer.customerId, f.inv1.id, 1, false);
     const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "UPI" });
     const s = await startPayment(order.id, f.customer.customerId);
-    await expect(verifyPayment(f.customer.customerId, { orderId: order.id, razorpayOrderId: s.razorpayOrderId, sandboxOutcome: "failure" })).rejects.toMatchObject({ code: "PAYMENT_FAILED" });
+    const failed = await verifyPayment(f.customer.customerId, { orderId: order.id, gatewayOrderId: s.gatewayOrderId, sandboxOutcome: "failure" });
+    expect(failed.outcome).toBe("failed");
     const retry = await startPayment(order.id, f.customer.customerId);
-    expect(retry.razorpayOrderId).not.toBe(s.razorpayOrderId);
-    await verifyPayment(f.customer.customerId, { orderId: order.id, razorpayOrderId: retry.razorpayOrderId, sandboxOutcome: "success" });
+    expect(retry.gatewayOrderId).not.toBe(s.gatewayOrderId);
+    const ok = await verifyPayment(f.customer.customerId, { orderId: order.id, gatewayOrderId: retry.gatewayOrderId, sandboxOutcome: "success" });
+    expect(ok.outcome).toBe("paid");
     expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("SHOP_PENDING");
   });
 });

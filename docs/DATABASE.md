@@ -91,7 +91,7 @@ erDiagram
 | `OrderItem` | Snapshot of product name, unit price, tax at purchase time. |
 | `OrderStatusHistory` | from → to, actor id + role, remarks, timestamp. |
 | `OrderModification` | Shop-requested reductions that require admin approval. |
-| `Payment` / `Refund` | Razorpay ids unique; refund statuses PENDING → PROCESSING → PROCESSED/FAILED. |
+| `Payment` / `Refund` | Cashfree order/payment ids unique; refund statuses PENDING → PROCESSING → PROCESSED/FAILED. |
 | `Shipment` | One per order; `channelOrderId` is the idempotency key sent to Shiprocket. Stores Shiprocket order/shipment ids, AWB, courier, label, pickup, attempts, last error. |
 | `ShipmentTrackingEvent` | Raw + mapped status, location, source (WEBHOOK/POLL/SYSTEM). |
 | `Commission` / `ShopSettlement` | Commission recorded on delivery; settlements bundle unsettled commissions per period. |

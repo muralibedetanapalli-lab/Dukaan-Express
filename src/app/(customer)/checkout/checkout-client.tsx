@@ -158,7 +158,7 @@ export function CheckoutClient({
 
         <Card className="gap-3 p-4">
           <p className="flex items-center gap-2 font-semibold">
-            <CreditCard className="size-5 text-primary" /> Payment method {sandbox && <SandboxBadge label="Razorpay sandbox" />}
+            <CreditCard className="size-5 text-primary" /> Payment method {sandbox && <SandboxBadge label="Payment sandbox" />}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {methods.map((m) => (

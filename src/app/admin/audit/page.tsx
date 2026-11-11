@@ -15,7 +15,7 @@ export default async function AuditPage() {
   ]);
   return (
     <div>
-      <PageHeader title="Audit log & webhooks" description="Who changed what, and every inbound Razorpay / Shiprocket event" />
+      <PageHeader title="Audit log & webhooks" description="Who changed what, and every inbound Cashfree / Shiprocket event" />
       <Tabs defaultValue="audit">
         <TabsList>
           <TabsTrigger value="audit">Audit log</TabsTrigger>

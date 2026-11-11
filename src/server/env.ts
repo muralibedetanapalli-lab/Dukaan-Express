@@ -13,9 +13,9 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
 
-  RAZORPAY_KEY_ID: blank,
-  RAZORPAY_KEY_SECRET: blank,
-  RAZORPAY_WEBHOOK_SECRET: blank,
+  CASHFREE_APP_ID: blank,
+  CASHFREE_SECRET_KEY: blank,
+  CASHFREE_ENV: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.enum(["sandbox", "production"]).default("sandbox")),
 
   SHIPROCKET_EMAIL: blank,
   SHIPROCKET_PASSWORD: blank,
@@ -59,7 +59,7 @@ export function env(): Env {
 export function integrationModes() {
   const e = env();
   return {
-    razorpay: e.RAZORPAY_KEY_ID && e.RAZORPAY_KEY_SECRET ? "live" : "mock",
+    cashfree: e.CASHFREE_APP_ID && e.CASHFREE_SECRET_KEY ? "live" : "mock",
     shiprocket: e.SHIPROCKET_EMAIL && e.SHIPROCKET_PASSWORD ? "live" : "mock",
     maps: e.GOOGLE_MAPS_API_KEY ? "live" : "mock",
     fcm: e.FCM_PROJECT_ID && e.FCM_CLIENT_EMAIL && e.FCM_PRIVATE_KEY ? "live" : "mock",

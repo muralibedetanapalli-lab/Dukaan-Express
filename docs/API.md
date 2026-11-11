@@ -14,7 +14,7 @@
 | Cart | `GET/POST/PATCH/DELETE /cart`, `GET /coupons` |
 | Customers | `GET/POST /customer/addresses`, `PATCH/DELETE /customer/addresses/:id`, `GET/POST /support/tickets` |
 | Orders | `GET/POST /orders` (POST needs `Idempotency-Key`), `GET /orders/:id`, `POST /orders/:id/cancel`, `POST /orders/:id/reorder`, `POST /orders/:id/review` |
-| Payments | `POST /orders/:id/pay`, `POST /payments/verify`, `POST /webhooks/razorpay` |
+| Payments | `POST /orders/:id/pay`, `POST /payments/verify`, `POST /webhooks/cashfree` |
 | Shop owner | `GET/PATCH /shop/me`, `GET /shop/dashboard`, `GET /shop/orders`, `GET /shop/orders/:id`, `POST /shop/orders/:id/action`, `POST /shop/orders/:id/modification`, `GET /shop/earnings` |
 | Inventory | `GET/POST /shop/inventory`, `GET/PATCH/DELETE /shop/inventory/:id`, `GET /shop/products/search` |
 | Shiprocket | `GET/POST /shop/orders/:id/shipment`, `GET /admin/shipments`, `POST /webhooks/shiprocket` (alias `/webhooks/courier`) |
@@ -47,4 +47,4 @@
 | `OUT_OF_STOCK`, `SHOP_CLOSED`, `SHOP_NOT_SERVICEABLE`, `MIN_ORDER`, `COD_LIMIT`, `COUPON_INVALID` | 422 | Checkout rule violations |
 | `NO_COURIER`, `COURIER_UNAVAILABLE`, `SHIPMENT_VALIDATION` | 422 | Shipment could not be created |
 | `RATE_LIMITED` | 429 | Too many requests |
-| `UPSTREAM_ERROR` | 502 | Razorpay / Shiprocket error |
+| `UPSTREAM_ERROR` | 502 | Cashfree / Shiprocket error |

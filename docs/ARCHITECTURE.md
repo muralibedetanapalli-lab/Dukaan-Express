@@ -32,7 +32,7 @@ flowchart LR
     end
     subgraph Adapters["Integration adapters (src/server/integrations)"]
       SR[Shiprocket<br/>live | mock]
-      RZ[Razorpay<br/>live | mock]
+      RZ[Cashfree<br/>live | mock]
       GM[Google Maps<br/>live | haversine]
       FCM[Firebase FCM<br/>live | log]
       SMS[SMS OTP<br/>live | console]
@@ -43,7 +43,7 @@ flowchart LR
 
   DB[(PostgreSQL<br/>Prisma 7)]
   EXT1[(Shiprocket API)]
-  EXT2[(Razorpay API)]
+  EXT2[(Cashfree PG API)]
   EXT3[(Google Maps)]
   EXT4[(FCM)]
 
@@ -72,7 +72,7 @@ flowchart LR
 | Stock | Reserved atomically at order placement with conditional `UPDATE … WHERE stock >= qty`; released on rejection / cancellation / payment failure. |
 | Multi-shop future | Cart lines carry `shopId`; `Order` has `checkoutGroupId` so one checkout can later fan out into one order per shop. v1 enforces single-shop carts in the cart service. |
 | Shiprocket | Server-only adapter with token caching, timeouts, retries (exponential backoff on 5xx / network). Shipment creation is idempotent: `Shipment` row has unique `orderId` and a deterministic `channelOrderId`; a `SHIPMENT_CREATING` lock is acquired by conditional update before calling Shiprocket, and on retry we first look up the existing Shiprocket order by channel order id before creating a new one. Courier unavailability → `Shipment.status = EXCEPTION`; admin/shop can retry or pick another courier. |
-| Payments | Razorpay order created server-side; client checkout returns signature which is verified with HMAC-SHA256. Webhook (`payment.captured`, `payment.failed`, `refund.processed`) verified with `X-Razorpay-Signature`. All webhooks are stored in `WebhookEvent` with a unique `(provider, eventId)` for de-duplication. |
+| Payments | Cashfree order (`/pg/orders`, API 2025-01-01) created server-side when checkout opens; the browser gets only a `payment_session_id` and opens the Cashfree JS SDK modal. Success is never taken from the browser: the server re-reads the order and its payments from Cashfree (amount must match). Webhooks (`PAYMENT_SUCCESS_WEBHOOK`, `PAYMENT_FAILED_WEBHOOK`, `REFUND_STATUS_WEBHOOK`) are verified with `x-webhook-signature` = base64 HMAC-SHA256(timestamp + raw body, secret key). All webhooks are stored in `WebhookEvent` with a unique `(provider, eventId)` for de-duplication. |
 | Real-time | Notifications persisted in DB, pushed over Server-Sent Events from an in-process event bus (with DB polling fallback, so it works across serverless instances), plus FCM push when configured. |
 | Mock adapters | When credentials are absent, each integration resolves to an isolated mock adapter (`*.mock.ts`) and the UI shows a "SANDBOX" badge. Mocks never pretend to be the real provider: shipment IDs are prefixed `MOCK-`. |
 
@@ -82,7 +82,7 @@ flowchart LR
 stateDiagram-v2
   [*] --> PAYMENT_PENDING: online payment
   [*] --> SHOP_PENDING: COD
-  PAYMENT_PENDING --> PAYMENT_CONFIRMED: Razorpay verified
+  PAYMENT_PENDING --> PAYMENT_CONFIRMED: Cashfree verified
   PAYMENT_PENDING --> CANCELLED: payment failed / timeout / customer
   PAYMENT_CONFIRMED --> SHOP_PENDING: auto
   SHOP_PENDING --> SHOP_ACCEPTED: shop
@@ -103,7 +103,7 @@ stateDiagram-v2
   SHOP_REJECTED --> REFUND_PENDING: if paid online
   CANCELLED --> REFUND_PENDING: if paid online
   DELIVERY_FAILED --> REFUND_PENDING: admin
-  REFUND_PENDING --> REFUNDED: Razorpay refund processed
+  REFUND_PENDING --> REFUNDED: Cashfree refund processed
 ```
 
 Customer-visible timeline groups these into: Order Placed → Payment Confirmed → Shop
@@ -168,7 +168,7 @@ sequenceDiagram
 │       ├── db.ts  env.ts  errors.ts  http.ts (apiHandler)  rate-limit.ts
 │       ├── auth/              jwt, session, password, otp
 │       ├── services/          domain logic (one file per bounded context)
-│       ├── integrations/      shiprocket/ razorpay/ maps/ fcm/ sms/ storage/ (live + mock)
+│       ├── integrations/      shiprocket/ cashfree/ maps/ fcm/ sms/ storage/ (live + mock)
 │       ├── realtime/          event bus
 │       └── openapi.ts         OpenAPI 3.1 document
 └── tests/                     vitest unit + integration tests
@@ -182,7 +182,7 @@ sequenceDiagram
 | 2 | Admin dashboard, shop onboarding, owners, categories | ✅ |
 | 3 | Shop owner app, inventory management | ✅ |
 | 4 | Customer app, location-based browsing | ✅ |
-| 5 | Cart, checkout, Razorpay, order creation | ✅ |
+| 5 | Cart, checkout, Cashfree, order creation | ✅ |
 | 6 | Accept / prepare / pack workflow | ✅ |
 | 7 | Shiprocket integration & shipment management | ✅ |
 | 8 | Notifications, SSE real-time, FCM | ✅ |

@@ -56,7 +56,7 @@ describe("order lifecycle (integration)", () => {
 
     const checkout = await startPayment(order.id, f.customer.customerId);
     expect(checkout.mode).toBe("sandbox");
-    await verifyPayment(f.customer.customerId, { orderId: order.id, razorpayOrderId: checkout.razorpayOrderId, sandboxOutcome: "success" });
+    await verifyPayment(f.customer.customerId, { orderId: order.id, gatewayOrderId: checkout.gatewayOrderId, sandboxOutcome: "success" });
     expect(await statusOf(order.id)).toBe("SHOP_PENDING");
 
     await transitionOrder(order.id, "SHOP_REJECTED", f.owner, { remarks: "Out of stock" });

@@ -30,7 +30,7 @@ export default async function CheckoutPage() {
       selectedAddressId={selected?.id ?? null}
       profile={{ name: user.name ?? "", phone: user.phone ?? "" }}
       payments={settings.payments}
-      sandbox={integrationModes().razorpay === "mock"}
+      sandbox={integrationModes().cashfree === "mock"}
     />
   );
 }

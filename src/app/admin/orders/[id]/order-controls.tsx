@@ -95,7 +95,7 @@ export function AdminOrderControls({ orderId, allowed, refundable }: { orderId: 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Issue refund</DialogTitle>
-            <DialogDescription>Refunds go back to the original payment method via Razorpay. Up to {formatINR(refundable)} can be refunded.</DialogDescription>
+            <DialogDescription>Refunds go back to the original payment method via Cashfree. Up to {formatINR(refundable)} can be refunded.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
             <div className="grid gap-1.5">
