@@ -94,7 +94,8 @@ erDiagram
 | `Payment` / `Refund` | Cashfree order/payment ids unique; refund statuses PENDING → PROCESSING → PROCESSED/FAILED. |
 | `Shipment` | One per order; `channelOrderId` is the idempotency key sent to Shiprocket. Stores Shiprocket order/shipment ids, AWB, courier, label, pickup, attempts, last error. |
 | `ShipmentTrackingEvent` | Raw + mapped status, location, source (WEBHOOK/POLL/SYSTEM). |
-| `Commission` / `ShopSettlement` | Commission recorded on delivery; settlements bundle unsettled commissions per period. |
+| `Commission` / `ShopSettlement` | Commission recorded on delivery; unsettled commissions are the shop's available balance. A settlement is a payout: requested by the owner (or created by admin), then PAID with UTR / method / receipt, or REJECTED / CANCELLED (orders return to the balance). |
+| `ShopBankAccount` | One per shop. Account number AES-256-GCM encrypted (key from `FIELD_ENCRYPTION_KEY`, else derived from `JWT_SECRET`); only the last 4 digits are shown to the owner. |
 | `Setting` | JSON per settings group, validated by zod on read and write. |
 | `AuditLog` | Every admin/shop mutation and order transition. |
 | `WebhookEvent` | Raw inbound webhooks with signature validity and processing result. |

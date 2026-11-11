@@ -16,7 +16,7 @@ const NAV = [
   { href: "/shop", label: "Home", icon: LayoutDashboard },
   { href: "/shop/orders", label: "Orders", icon: ClipboardList },
   { href: "/shop/inventory", label: "Inventory", icon: Boxes },
-  { href: "/shop/earnings", label: "Earnings", icon: IndianRupee },
+  { href: "/shop/earnings", label: "Earnings & payouts", icon: IndianRupee },
   { href: "/shop/settings", label: "Settings", icon: Settings },
 ];
 

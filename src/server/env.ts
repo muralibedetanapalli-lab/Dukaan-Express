@@ -12,6 +12,7 @@ const schema = z.object({
   APP_URL: z.string().default("http://localhost:3000"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
+  FIELD_ENCRYPTION_KEY: blank, // optional; bank account numbers are encrypted with a key derived from this (or JWT_SECRET)
 
   CASHFREE_APP_ID: blank,
   CASHFREE_SECRET_KEY: blank,

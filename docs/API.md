@@ -15,10 +15,10 @@
 | Customers | `GET/POST /customer/addresses`, `PATCH/DELETE /customer/addresses/:id`, `GET/POST /support/tickets` |
 | Orders | `GET/POST /orders` (POST needs `Idempotency-Key`), `GET /orders/:id`, `POST /orders/:id/cancel`, `POST /orders/:id/reorder`, `POST /orders/:id/review` |
 | Payments | `POST /orders/:id/pay`, `POST /payments/verify`, `POST /webhooks/cashfree` |
-| Shop owner | `GET/PATCH /shop/me`, `GET /shop/dashboard`, `GET /shop/orders`, `GET /shop/orders/:id`, `POST /shop/orders/:id/action`, `POST /shop/orders/:id/modification`, `GET /shop/earnings` |
+| Shop owner | `GET/PATCH /shop/me`, `GET /shop/dashboard`, `GET /shop/orders`, `GET /shop/orders/:id`, `POST /shop/orders/:id/action`, `POST /shop/orders/:id/modification`, `GET /shop/earnings`, `GET/PATCH /shop/bank-account`, `GET/POST /shop/payouts`, `POST /shop/payouts/:id/cancel` |
 | Inventory | `GET/POST /shop/inventory`, `GET/PATCH/DELETE /shop/inventory/:id`, `GET /shop/products/search` |
 | Shiprocket | `GET/POST /shop/orders/:id/shipment`, `GET /admin/shipments`, `POST /webhooks/shiprocket` (alias `/webhooks/courier`) |
-| Admin | `GET /admin/dashboard`, shops, owners, categories, subcategories, products, attributes, orders (+ `/action`), modifications, customers, tickets, settlements, coupons, banners, service-areas, audit-logs, webhooks |
+| Admin | `GET /admin/dashboard`, shops, owners, categories, subcategories, products, attributes, orders (+ `/action`), modifications, customers, tickets, settlements (payouts: `POST /admin/settlements/:id` records the transfer, `/reject` declines), coupons, banners, service-areas, audit-logs, webhooks |
 | Reports | `GET /admin/reports?type=&format=csv|xlsx|pdf|json&from=&to=&shopId=` |
 | Settings | `GET/PATCH /admin/settings` |
 | Notifications | `GET/POST /notifications`, `POST/DELETE /devices`, `GET /realtime` (SSE) |

@@ -2,9 +2,9 @@ import { api } from "@/server/http";
 import { badRequest } from "@/server/errors";
 import { uploadImage } from "@/server/integrations/storage";
 
-const FOLDERS = ["products", "shops", "categories", "banners", "platform"] as const;
+const FOLDERS = ["products", "shops", "categories", "banners", "platform", "payouts"] as const;
 
-/** multipart/form-data: file=<image>, folder=<products|shops|…>. Max 5 MB, images only (magic-byte checked). */
+/** multipart/form-data: file=<image>, folder=<products|shops|…|payouts (admin: transfer receipts)>. Max 5 MB, images only (magic-byte checked). */
 export const POST = api(
   { roles: ["SUPER_ADMIN", "SHOP_OWNER"], rateLimit: { name: "upload", limit: 30 } },
   async ({ req, user }) => {

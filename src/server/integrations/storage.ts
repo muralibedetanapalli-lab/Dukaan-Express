@@ -20,7 +20,7 @@ export function sniffImage(buf: Buffer): { mime: string; ext: string } | null {
   return null;
 }
 
-export async function uploadImage(file: File, folder: "products" | "shops" | "categories" | "banners" | "platform") {
+export async function uploadImage(file: File, folder: "products" | "shops" | "categories" | "banners" | "platform" | "payouts") {
   if (file.size > MAX_BYTES) throw badRequest("Image must be 5 MB or smaller");
   const buf = Buffer.from(await file.arrayBuffer());
   const kind = sniffImage(buf);

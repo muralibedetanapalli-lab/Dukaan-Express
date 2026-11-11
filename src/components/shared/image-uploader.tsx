@@ -16,7 +16,7 @@ export function ImageUploader({
 }: {
   value: string[];
   onChange: (urls: string[]) => void;
-  folder: "products" | "shops" | "categories" | "banners" | "platform";
+  folder: "products" | "shops" | "categories" | "banners" | "platform" | "payouts";
   max?: number;
   className?: string;
 }) {

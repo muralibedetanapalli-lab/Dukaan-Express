@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ImageUploader } from "@/components/shared/image-uploader";
+import { formatINR } from "@/lib/money";
 import { api, errorMessage } from "@/lib/api-client";
 
 export function GenerateSettlement({ shopId, shopName, from, to }: { shopId: string; shopName: string; from: string; to: string }) {
@@ -62,32 +66,132 @@ export function GenerateSettlement({ shopId, shopName, from, to }: { shopId: str
   );
 }
 
-export function MarkPaid({ id }: { id: string }) {
+const METHODS = ["IMPS", "NEFT", "RTGS", "UPI", "OTHER"] as const;
+const today = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
+
+/** Click-to-copy value, for pasting bank details into net banking. */
+export function CopyValue({ value, className }: { value: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-1 font-mono hover:text-primary ${className ?? ""}`}
+      title="Copy"
+      onClick={() => navigator.clipboard.writeText(value).then(() => toast.success("Copied"), () => toast.error("Couldn't copy"))}
+    >
+      {value} <Copy className="size-3 opacity-60" />
+    </button>
+  );
+}
+
+/** Record the transfer: UTR, method, date, optional receipt screenshot and note. The shop sees all of it. */
+export function MarkPaid({ id, amount, shopName }: { id: string; amount?: number; shopName?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [ref, setRef] = useState("");
+  const [method, setMethod] = useState<(typeof METHODS)[number]>("IMPS");
+  const [date, setDate] = useState(today);
+  const [notes, setNotes] = useState("");
+  const [proof, setProof] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)}>
         Mark paid
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record payout</DialogTitle>
+            <DialogTitle>Record transfer{amount != null ? ` · ${formatINR(amount)}` : ""}</DialogTitle>
+            <DialogDescription>{shopName ? `${shopName} will see these transaction details in their payout history.` : "The shop will see these transaction details."}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-1.5">
-            <Label htmlFor="utr">Bank reference / UTR</Label>
-            <Input id="utr" value={ref} onChange={(e) => setRef(e.target.value)} />
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Method</Label>
+                <Select value={method} onValueChange={(v) => setMethod(v as (typeof METHODS)[number])}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METHODS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m === "OTHER" ? "Other" : m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="paid-on">Transfer date</Label>
+                <Input id="paid-on" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="utr">UTR / transaction reference</Label>
+              <Input id="utr" value={ref} onChange={(e) => setRef(e.target.value.trim())} placeholder="e.g. 431512345678" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Receipt screenshot (optional)</Label>
+              <ImageUploader value={proof} onChange={(u) => setProof(u.slice(-1))} folder="payouts" max={1} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pay-notes">Note to shop (optional)</Label>
+              <Textarea id="pay-notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} rows={2} />
+            </div>
+            <Button
+              disabled={busy || ref.length < 3}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const paidAt = date === today() ? new Date().toISOString() : new Date(`${date}T12:00:00`).toISOString();
+                  await api(`/admin/settlements/${id}`, { body: { reference: ref, payoutMethod: method, paidAt, notes: notes.trim() || null, proofUrl: proof[0] ?? null } });
+                  toast.success("Payout recorded. The shop has been notified.");
+                  setOpen(false);
+                  router.refresh();
+                } catch (e) {
+                  toast.error(errorMessage(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy && <Loader2 className="animate-spin" />} Confirm transfer
+            </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export function RejectPayout({ id }: { id: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        Decline
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline payout request</DialogTitle>
+            <DialogDescription>The orders go back to the shop&apos;s available balance. The shop sees this reason.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Bank account name doesn't match the shop owner" maxLength={300} rows={3} />
           <Button
-            disabled={busy || ref.trim().length < 3}
+            variant="destructive"
+            disabled={busy || reason.trim().length < 3}
             onClick={async () => {
               setBusy(true);
               try {
-                await api(`/admin/settlements/${id}`, { body: { reference: ref } });
-                toast.success("Marked as paid");
+                await api(`/admin/settlements/${id}/reject`, { body: { reason: reason.trim() } });
+                toast.success("Request declined");
                 setOpen(false);
                 router.refresh();
               } catch (e) {
@@ -97,7 +201,7 @@ export function MarkPaid({ id }: { id: string }) {
               }
             }}
           >
-            {busy && <Loader2 className="animate-spin" />} Confirm payout
+            {busy && <Loader2 className="animate-spin" />} Decline request
           </Button>
         </DialogContent>
       </Dialog>

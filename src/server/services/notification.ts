@@ -17,6 +17,7 @@ export type NotificationType =
   | "REFUND"
   | "SHOP"
   | "SUPPORT"
+  | "PAYOUT"
   | "MODIFICATION";
 
 export interface NotifyInput {

@@ -91,9 +91,11 @@ enum RefundStatus {
 }
 
 enum SettlementStatus {
-  PENDING
+  PENDING // requested by the shop owner (or created by admin), awaiting transfer
   PROCESSING
   PAID
+  REJECTED // admin declined; its orders return to the available balance
+  CANCELLED // owner withdrew the request; its orders return to the available balance
 }
 
 enum CouponType {
@@ -232,6 +234,7 @@ model Shop {
   orders      Order[]
   commissions Commission[]
   settlements ShopSettlement[]
+  bankAccount ShopBankAccount?
   reviews     Review[]
   coupons     Coupon[]
   cartItems   CartItem[]
@@ -759,8 +762,14 @@ model ShopSettlement {
   commissionAmount Int
   netPayable       Int
   status           SettlementStatus @default(PENDING)
-  reference        String?
+  requestedBy      String? // "SHOP" (owner payout request) or "ADMIN"
+  requestedById    String? // user id
+  bankSnapshot     Json? // payout account at request time (account number masked)
+  reference        String? // bank UTR / transaction id
+  payoutMethod     String? // IMPS / NEFT / RTGS / UPI / OTHER
+  proofUrl         String? // receipt screenshot uploaded by admin
   notes            String?
+  rejectionReason  String?
   paidAt           DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -768,6 +777,23 @@ model ShopSettlement {
   commissions Commission[]
 
   @@index([shopId, periodStart])
+  @@index([shopId, status])
+}
+
+/// Where a shop wants its payouts sent. The account number is AES-256-GCM encrypted at rest.
+model ShopBankAccount {
+  id                String   @id @default(cuid())
+  shopId            String   @unique
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  accountHolderName String
+  accountNumberEnc  String
+  accountLast4      String
+  ifsc              String
+  bankName          String?
+  upiId             String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 // ───────────────────────────── Engagement & support ─────────────────────────────

@@ -86,7 +86,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 1. **Customer** (`/login`, `9876543210`): pick a location (Koramangala), add items, check out with COD or UPI.
 2. **Shop owner** (`fatima@…` for the pharmacy): the new order arrives instantly with a sound. Then tap Accept Order → Start Preparing → Ready for Packing → Order Packed. The Shiprocket shipment is created automatically and the order becomes **Awaiting pickup**.
 3. Click **Simulate next courier update** to move it through Rider assigned → Picked up → Out for delivery → Delivered. The customer's timeline updates live.
-4. **Admin** (`/admin`): see the order, its shipment, payment and commission. Generate a settlement under *Commission & payouts* and download reports from *Reports*.
+4. **Admin** (`/admin`): see the order, its shipment, payment and commission. Under *Commission & payouts*, handle payout requests (shop owners add a bank account and request their balance under *Earnings & payouts*; you transfer it and record the UTR and receipt) and download reports from *Reports*.
 
 ## Scripts
 

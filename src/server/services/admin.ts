@@ -289,44 +289,6 @@ export async function upsertSubcategory(actor: SessionUser, id: string | null, i
   return sub;
 }
 
-// ───────────────────────────── Settlements ─────────────────────────────
-
-/** Bundle all unsettled commissions for a shop in a period into a settlement. */
-export async function generateSettlement(actor: SessionUser, shopId: string, periodStart: Date, periodEnd: Date) {
-  const result = await db.$transaction(async (tx) => {
-    const commissions = await tx.commission.findMany({
-      where: { shopId, settlementId: null, createdAt: { gte: periodStart, lte: periodEnd } },
-      include: { order: { select: { total: true } } },
-    });
-    if (!commissions.length) throw badRequest("No unsettled delivered orders in this period");
-    const settlement = await tx.shopSettlement.create({
-      data: {
-        shopId,
-        periodStart,
-        periodEnd,
-        orderCount: commissions.length,
-        grossSales: commissions.reduce((s, c) => s + c.baseAmount, 0),
-        commissionAmount: commissions.reduce((s, c) => s + c.amount, 0),
-        netPayable: commissions.reduce((s, c) => s + c.shopEarning, 0),
-      },
-    });
-    await tx.commission.updateMany({ where: { id: { in: commissions.map((c) => c.id) } }, data: { settlementId: settlement.id } });
-    return settlement;
-  });
-  await audit(actorOf(actor), "settlement.generate", "ShopSettlement", result.id, { after: result });
-  return result;
-}
-
-export async function markSettlementPaid(actor: SessionUser, id: string, reference: string, notes?: string | null) {
-  const s = await db.shopSettlement.findUnique({ where: { id } });
-  if (!s) throw notFound("Settlement");
-  if (s.status === "PAID") throw conflict("Settlement already marked as paid");
-  const updated = await db.shopSettlement.update({ where: { id }, data: { status: "PAID", reference, notes: notes ?? null, paidAt: new Date() } });
-  await audit(actorOf(actor), "settlement.paid", "ShopSettlement", id, { after: { reference } });
-  await notifyShop(s.shopId, { type: "SHOP", title: "Settlement paid", body: `Payout reference ${reference}`, link: "/shop/earnings" });
-  return updated;
-}
-
 // ───────────────────────────── Customers ─────────────────────────────
 
 export async function setCustomerStatus(actor: SessionUser, customerId: string, status: "ACTIVE" | "INACTIVE") {
