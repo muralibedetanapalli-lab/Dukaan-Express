@@ -10,6 +10,7 @@ export const POLICIES = [
   { slug: "refunds", title: "Cancellation & Refund Policy", short: "Cancellations & refunds" },
   { slug: "shipping", title: "Shipping & Delivery Policy", short: "Shipping & delivery" },
   { slug: "seller-terms", title: "Seller Terms", short: "Seller terms" },
+  { slug: "delete-account", title: "Delete your account", short: "Delete account" },
   { slug: "contact", title: "Contact Us", short: "Contact" },
 ] as const;
 

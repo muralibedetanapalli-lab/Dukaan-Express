@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { handleCashfreeWebhook, verifyPayment, startPayment } from "@/server/services/payment";
 import {
   customerLogin,
+  deleteCustomerAccount,
   requestOtp,
   resetPassword,
   sendPasswordResetCode,
@@ -171,6 +172,33 @@ describe("authentication", () => {
     await expect(customerLogin("r@example.com", "OldPass123", "ip")).rejects.toMatchObject({ status: 401 });
     expect((await customerLogin("r@example.com", "NewPass123", "ip")).id).toBe(u.id);
     await expect(resetPassword("r@example.com", r.devCode!, "Another123", "ip")).rejects.toBeTruthy(); // single use
+  });
+
+  it("customer can delete their account: needs password, waits for open orders, erases personal data", async () => {
+    const f = await fixture();
+    await db.user.update({ where: { id: f.customer.userId }, data: { email: "del@example.com", passwordHash: await hashPassword("Secret123") } });
+    await addToCart(f.customer.customerId, f.inv1.id, 1, false);
+    await db.deviceToken.create({ data: { userId: f.customer.userId, token: "tok-del-1" } });
+    const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "COD" });
+
+    await expect(deleteCustomerAccount(f.customer.userId, "wrong123", "ip")).rejects.toMatchObject({ status: 401 });
+    await expect(deleteCustomerAccount(f.customer.userId, "Secret123", "ip")).rejects.toMatchObject({ status: 409 }); // order still open
+
+    await db.order.update({ where: { id: order.id }, data: { status: "DELIVERED" } });
+    await addToCart(f.customer.customerId, f.inv1.id, 1, false);
+    const before = await db.user.findUniqueOrThrow({ where: { id: f.customer.userId } });
+    await deleteCustomerAccount(f.customer.userId, "Secret123", "ip");
+
+    const u = await db.user.findUniqueOrThrow({ where: { id: f.customer.userId } });
+    expect(u).toMatchObject({ email: null, phone: null, passwordHash: null, name: "Deleted user", status: "INACTIVE" });
+    expect(u.deletedAt).toBeInstanceOf(Date);
+    expect(u.sessionVersion).toBe(before.sessionVersion + 1);
+    expect(await db.customerAddress.count({ where: { customerId: f.customer.customerId, deletedAt: null } })).toBe(0);
+    expect(await db.cartItem.count({ where: { cart: { customerId: f.customer.customerId } } })).toBe(0);
+    expect(await db.deviceToken.count({ where: { userId: f.customer.userId } })).toBe(0);
+    // The order record (with its own address snapshot) is kept.
+    expect((await db.order.findUniqueOrThrow({ where: { id: order.id } })).contactPhone).toBe(order.contactPhone);
+    await expect(customerLogin("del@example.com", "Secret123", "ip")).rejects.toMatchObject({ status: 401 });
   });
 
   it("session tokens are signed and tamper-evident", async () => {

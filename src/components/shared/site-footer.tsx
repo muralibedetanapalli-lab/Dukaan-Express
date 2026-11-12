@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/legal/refunds", label: "Cancellations & Refunds" },
   { href: "/legal/shipping", label: "Shipping & Delivery" },
   { href: "/legal/seller-terms", label: "Seller Terms" },
+  { href: "/legal/delete-account", label: "Delete Account" },
   { href: "/legal/contact", label: "Contact Us" },
 ];
 

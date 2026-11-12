@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { legalContext } from "../_lib/context";
 import { Doc, List, Mail, Section } from "../_lib/ui";
 
@@ -76,7 +77,11 @@ export default async function PrivacyPage() {
           <li>raise a grievance with us, and then with the Data Protection Board of India if it is not resolved.</li>
         </List>
         <p>
-          To use any of these rights, including deleting your account, email <Mail to={c.supportEmail} /> from or mentioning your registered mobile number. We respond within 30 days.
+          You can delete your account yourself in the app under <b>Account → Delete account</b> (see{" "}
+          <Link href="/legal/delete-account" className="font-medium text-primary hover:underline">
+            how account deletion works
+          </Link>
+          ). To use any of the other rights, email <Mail to={c.supportEmail} /> from your registered email address or mentioning your registered mobile number. We respond within 30 days.
         </p>
       </Section>
 

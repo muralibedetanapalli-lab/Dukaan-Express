@@ -15,6 +15,7 @@ import { ConfirmButton } from "@/components/shared/confirm-button";
 import { Pill } from "@/components/shared/status-badge";
 import { api, errorMessage } from "@/lib/api-client";
 import { fmtDate } from "@/lib/format";
+import { DeleteAccountCard } from "./delete-account";
 
 interface Addr extends AddressValue {
   id: string;
@@ -167,6 +168,8 @@ export function AccountClient({
           )}
         </Card>
       </div>
+
+      <DeleteAccountCard />
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">

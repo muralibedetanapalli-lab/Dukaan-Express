@@ -8,6 +8,7 @@ import { getSettings } from "./settings";
 import { sendOtpSms } from "@/server/integrations/sms";
 import { integrationModes } from "@/server/env";
 import { audit } from "./audit";
+import { TERMINAL_STATUSES } from "@/lib/order-status";
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -235,4 +236,53 @@ export async function resetPassword(rawEmail: string, code: string, newPassword:
   });
   await audit({ id: user.id, role: user.role }, "user.password_reset", "User", user.id, { ip });
   return updated;
+}
+
+// ───────────────────────────── Account deletion (customers) ─────────────────────────────
+
+/**
+ * Customer self-service deletion (Google Play account-deletion requirement).
+ * Personal data on the account is erased; orders keep their own address/contact snapshot, which is
+ * retained for tax and legal record-keeping. Email and mobile are freed, so the person can sign up again.
+ */
+export async function deleteCustomerAccount(userId: string, password: string, ip: string) {
+  const user = await db.user.findUnique({ where: { id: userId }, include: { customer: true } });
+  if (!user || user.role !== "CUSTOMER" || !user.customer || user.deletedAt) throw badRequest("Account not found");
+  if (!user.passwordHash || !(await verifyPassword(password, user.passwordHash))) throw unauthorized("Incorrect password");
+
+  const open = await db.order.count({ where: { customerId: user.customer.id, status: { notIn: TERMINAL_STATUSES } } });
+  if (open > 0) {
+    throw conflict(
+      `You have ${open} order${open > 1 ? "s" : ""} still in progress or awaiting a refund. Please wait until ${open > 1 ? "they are" : "it is"} completed, then delete your account.`,
+    );
+  }
+
+  const customerId = user.customer.id;
+  const now = new Date();
+  await db.$transaction([
+    db.customerAddress.updateMany({
+      where: { customerId },
+      data: { deletedAt: now, isDefault: false, name: "Deleted", phone: "0000000000", line1: "Deleted", line2: null, landmark: null, latitude: 0, longitude: 0 },
+    }),
+    db.cartItem.deleteMany({ where: { cart: { customerId } } }),
+    db.cart.updateMany({ where: { customerId }, data: { couponCode: null } }),
+    db.deviceToken.deleteMany({ where: { userId } }),
+    db.notification.deleteMany({ where: { userId } }),
+    ...(user.email ? [db.emailCode.deleteMany({ where: { email: user.email } })] : []),
+    ...(user.phone ? [db.otp.deleteMany({ where: { phone: user.phone } })] : []),
+    db.user.update({
+      where: { id: userId },
+      data: {
+        name: "Deleted user",
+        email: null,
+        phone: null,
+        passwordHash: null,
+        emailVerifiedAt: null,
+        status: "INACTIVE",
+        deletedAt: now,
+        sessionVersion: { increment: 1 },
+      },
+    }),
+  ]);
+  await audit({ id: userId, role: "CUSTOMER" }, "account.delete", "User", userId, { ip });
 }
