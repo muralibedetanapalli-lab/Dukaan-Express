@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { POWERED_BY } from "./brand";
 
 const LINKS = [
   { href: "/legal/terms", label: "Terms of Use" },
@@ -24,7 +23,7 @@ export function SiteFooter({ brand = "Dukaan Express", entity }: { brand?: strin
           ))}
         </nav>
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} {entity || brand} · Powered by {POWERED_BY}
+          © {new Date().getFullYear()} {entity || brand}
         </p>
       </div>
     </footer>

@@ -127,8 +127,7 @@ for (const a of APPS) {
     FW,
     FH,
     `<defs>${grad("g", a.from, a.to)}</defs><rect width="${FW}" height="${FH}" fill="url(#g)"/>${blobs(FW, FH)}
-     <text x="232" y="150" font-family="${FONT}" font-weight="700" font-size="56" fill="#ffffff">${esc(a.name)}</text>
-     <text x="234" y="190" font-family="${FONT}" font-weight="600" font-size="22" fill="#ffffff" fill-opacity="0.8" letter-spacing="1">POWERED BY ABHAYCART</text>
+     <text x="232" y="170" font-family="${FONT}" font-weight="700" font-size="56" fill="#ffffff">${esc(a.name)}</text>
      ${lines.map((l, i) => `<text x="80" y="${290 + i * 46}" font-family="${FONT}" font-weight="400" font-size="36" fill="#ffffff">${esc(l)}</text>`).join("")}`,
   );
   await sharp(fg)

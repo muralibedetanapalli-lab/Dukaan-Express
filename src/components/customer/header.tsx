@@ -31,7 +31,7 @@ export function CustomerHeader({ user, location, eta }: Props) {
           <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
             <Zap className="size-4" />
           </span>
-          <BrandName className="hidden lg:inline-flex" poweredClassName="text-muted-foreground opacity-100" />
+          <BrandName className="hidden lg:inline-flex" />
         </Link>
         <div className="min-w-0 flex-1 sm:max-w-56 sm:flex-none">
           <LocationPicker current={location} loggedIn={!!user} eta={eta} />

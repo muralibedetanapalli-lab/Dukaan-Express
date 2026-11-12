@@ -8,8 +8,8 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Dukaan Express — groceries & essentials in minutes · Powered by AbhayCart", template: "%s · Dukaan Express" },
-  description: "Order from trusted local shops near you and get it delivered in minutes. Dukaan Express is powered by AbhayCart.",
+  title: { default: "Dukaan Express — groceries & essentials in minutes", template: "%s · Dukaan Express" },
+  description: "Order from trusted local shops near you and get it delivered in minutes.",
   applicationName: "Dukaan Express",
 };
 

@@ -28,7 +28,7 @@ Website:          BASE
 1. **Developer account:** play.google.com/console → sign up (US$25).
    - Choose **Organization** if you have a registered business. It needs a D-U-N-S number (free, takes about 1–2 weeks).
    - A **Personal** account has to run a *closed test with at least 12 testers for 14 days in a row* before it can publish to production.
-   - **Developer name: `AbhayCart`.** Play shows it right under the app name, so the listing reads *"Dukaan Express · AbhayCart"*, which is your "Powered by AbhayCart".
+   - **Developer name:** your business or brand name. Play shows it right under the app name.
 2. **Admin → Settings on the live site:**
    - **Platform:** set your real support email and phone. They still show the placeholders `support@dukaanexpress.in` and `1800-123-4567`, and the policy pages display them.
    - **Legal & business:** fill in business name, address, GSTIN and grievance officer.
@@ -77,8 +77,6 @@ HOW IT WORKS
 
 SAFE AND PRIVATE
 Your account is protected with a password and a verified email address. Payments are processed securely by Cashfree Payments — we never see your card number or UPI PIN. You can delete your account at any time from the app.
-
-Dukaan Express is powered by AbhayCart.
 
 Questions? Write to us from the Help section of any order, or see our policies at https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io/legal
 ```
@@ -129,8 +127,6 @@ GET PAID WHEN YOU WANT
 • Track every payout with its bank reference number
 
 Dukaan Partner is for registered sellers on Dukaan Express. To start selling, contact the Dukaan Express team to get your shop approved.
-
-Dukaan Express is powered by AbhayCart.
 ```
 
 **Release notes**

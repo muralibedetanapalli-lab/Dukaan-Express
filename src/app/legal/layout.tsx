@@ -16,7 +16,7 @@ export default async function LegalLayout({ children }: { children: React.ReactN
       <header className="border-b">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-            <Zap className="size-5" /> <BrandName name={c.brand} poweredClassName="text-muted-foreground opacity-100" />
+            <Zap className="size-5" /> <BrandName name={c.brand} />
           </Link>
           <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
             Back to shopping
