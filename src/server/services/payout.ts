@@ -7,7 +7,7 @@ import { decryptField, encryptField } from "@/server/crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { formatINR } from "@/lib/money";
 import { audit } from "./audit";
-import { notifyAdmins, notifyShop } from "./notification";
+import { notifyAdmins, notifyShop, notifyUsers } from "./notification";
 
 /**
  * Shop payouts. Every delivered order creates a Commission row (gross − platform commission = shopEarning).
@@ -17,7 +17,8 @@ import { notifyAdmins, notifyShop } from "./notification";
  */
 
 const actorOf = (u: SessionUser) => ({ id: u.id, role: u.role });
-const OPEN_STATUSES = ["PENDING", "PROCESSING"] as const;
+/** A payout that still holds its orders: waiting for the dealer, waiting for the admin, or being transferred. */
+const OPEN_STATUSES = ["DEALER_REVIEW", "PENDING", "PROCESSING"] as const;
 export const PAYOUT_METHODS = ["IMPS", "NEFT", "RTGS", "UPI", "OTHER"] as const;
 
 // ───────────────────────────── Bank account ─────────────────────────────
@@ -56,9 +57,10 @@ export interface BankView {
   updatedAt: Date;
 }
 
-type BankRow = Prisma.ShopBankAccountGetPayload<object>;
+type BankRow = Pick<Prisma.ShopBankAccountGetPayload<object>, "accountHolderName" | "accountLast4" | "ifsc" | "bankName" | "upiId" | "updatedAt">;
 const mask = (last4: string) => `•••• ${last4}`;
-const toView = (b: BankRow): BankView => ({
+/** Masked view of a shop or dealer bank account. */
+export const toView = (b: BankRow): BankView => ({
   accountHolderName: b.accountHolderName,
   accountNumberMasked: mask(b.accountLast4),
   accountLast4: b.accountLast4,
@@ -134,7 +136,7 @@ async function bundle(
   tx: Prisma.TransactionClient,
   shopId: string,
   where: Prisma.CommissionWhereInput,
-  meta: { requestedBy: "SHOP" | "ADMIN"; requestedById: string; bank: BankView | null },
+  meta: { requestedBy: "SHOP" | "ADMIN"; requestedById: string; bank: BankView | null; dealerId?: string | null },
 ) {
   const commissions = await tx.commission.findMany({ where: { ...where, shopId, settlementId: null }, select: { id: true, baseAmount: true, amount: true, shopEarning: true, createdAt: true } });
   if (!commissions.length) throw badRequest("No delivered orders waiting for payout");
@@ -152,6 +154,9 @@ async function bundle(
       netPayable: net,
       requestedBy: meta.requestedBy,
       requestedById: meta.requestedById,
+      // Requests from a dealer's shop go to that dealer first; admin-created payouts skip the review.
+      status: meta.dealerId ? "DEALER_REVIEW" : "PENDING",
+      dealerId: meta.dealerId ?? null,
       bankSnapshot: meta.bank
         ? ({ accountHolderName: meta.bank.accountHolderName, accountLast4: meta.bank.accountLast4, ifsc: meta.bank.ifsc, bankName: meta.bank.bankName, upiId: meta.bank.upiId } as Prisma.InputJsonValue)
         : undefined,
@@ -167,16 +172,18 @@ async function bundle(
 export async function requestPayout(actor: SessionUser, shopId: string) {
   const bank = await getBankAccount(shopId);
   if (!bank) throw badRequest("Add your bank account before requesting a payout");
+  const shop = await db.shop.findUnique({ where: { id: shopId }, select: { name: true, dealer: { select: { id: true, userId: true } } } });
   const result = await db.$transaction(async (tx) => {
     // Serialise requests per shop so two taps can't create two open payouts.
     await tx.$executeRaw`SELECT id FROM "Shop" WHERE id = ${shopId} FOR UPDATE`;
     const open = await tx.shopSettlement.findFirst({ where: { shopId, status: { in: [...OPEN_STATUSES] } }, select: { id: true } });
     if (open) throw conflict("You already have a payout request in progress");
-    return bundle(tx, shopId, {}, { requestedBy: "SHOP", requestedById: actor.id, bank });
+    return bundle(tx, shopId, {}, { requestedBy: "SHOP", requestedById: actor.id, bank, dealerId: shop?.dealer?.id });
   });
-  await audit(actorOf(actor), "payout.request", "ShopSettlement", result.id, { after: { netPayable: result.netPayable, orders: result.orderCount } });
-  const shop = await db.shop.findUnique({ where: { id: shopId }, select: { name: true } });
-  await notifyAdmins({ type: "PAYOUT", title: "Payout requested", body: `${shop?.name} requested ${formatINR(result.netPayable)} (${result.orderCount} orders)`, link: "/admin/finance" });
+  await audit(actorOf(actor), "payout.request", "ShopSettlement", result.id, { after: { netPayable: result.netPayable, orders: result.orderCount, status: result.status } });
+  const body = `${shop?.name} requested ${formatINR(result.netPayable)} (${result.orderCount} orders)`;
+  if (shop?.dealer) await notifyUsers([shop.dealer.userId], { type: "PAYOUT", title: "Payout to review", body, link: "/dealer/payouts" });
+  else await notifyAdmins({ type: "PAYOUT", title: "Payout requested", body, link: "/admin/finance" });
   return result;
 }
 
@@ -184,7 +191,7 @@ export async function cancelPayout(actor: SessionUser, shopId: string, id: strin
   const result = await db.$transaction(async (tx) => {
     const s = await tx.shopSettlement.findFirst({ where: { id, shopId } });
     if (!s) throw notFound("Payout");
-    if (s.status !== "PENDING") throw conflict("Only a pending request can be cancelled");
+    if (s.status !== "PENDING" && s.status !== "DEALER_REVIEW") throw conflict("Only a pending request can be cancelled");
     await tx.commission.updateMany({ where: { settlementId: id }, data: { settlementId: null } });
     return tx.shopSettlement.update({ where: { id }, data: { status: "CANCELLED" } });
   });
@@ -217,6 +224,7 @@ export async function markSettlementPaid(actor: SessionUser, id: string, input: 
   if (!s) throw notFound("Payout");
   if (s.status === "PAID") throw conflict("Payout already marked as paid");
   if (s.status === "REJECTED" || s.status === "CANCELLED") throw conflict(`Payout was ${s.status.toLowerCase()}`);
+  if (s.status === "DEALER_REVIEW") throw conflict("This payout is waiting for the dealer's approval");
   const paidAt = input.paidAt && input.paidAt.getTime() <= Date.now() + 60_000 ? input.paidAt : new Date();
   const updated = await db.shopSettlement.update({
     where: { id, status: s.status },

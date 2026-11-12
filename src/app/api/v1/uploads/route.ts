@@ -6,7 +6,7 @@ const FOLDERS = ["products", "shops", "categories", "banners", "platform", "payo
 
 /** multipart/form-data: file=<image>, folder=<products|shops|…|payouts (admin: transfer receipts)>. Max 5 MB, images only (magic-byte checked). */
 export const POST = api(
-  { roles: ["SUPER_ADMIN", "SHOP_OWNER"], rateLimit: { name: "upload", limit: 30 } },
+  { roles: ["SUPER_ADMIN", "SHOP_OWNER", "DEALER"], rateLimit: { name: "upload", limit: 30 } },
   async ({ req, user }) => {
     const form = await req.formData().catch(() => null);
     if (!form) throw badRequest("Expected multipart/form-data");
@@ -15,6 +15,7 @@ export const POST = api(
     if (!(file instanceof File)) throw badRequest("No file uploaded");
     if (!(FOLDERS as readonly string[]).includes(folder)) throw badRequest("Invalid folder");
     if (user.role === "SHOP_OWNER" && folder !== "products") throw badRequest("Shop owners can only upload product images");
+    if (user.role === "DEALER" && folder !== "shops") throw badRequest("Dealers can only upload shop images");
     return uploadImage(file, folder as (typeof FOLDERS)[number]);
   },
 );

@@ -28,6 +28,10 @@ describe("money", () => {
     expect(formatINR(10000)).toBe("₹100");
     expect(applyBps(10000, 1250)).toBe(1250);
     expect(bpsToPercent(1250)).toBe("12.5%");
+    expect(bpsToPercent(1000)).toBe("10%");
+    expect(bpsToPercent(2000)).toBe("20%");
+    expect(bpsToPercent(1234)).toBe("12.34%");
+    expect(bpsToPercent(0)).toBe("0%");
     expect(discountPercent(10000, 7500)).toBe(25);
   });
 });

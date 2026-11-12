@@ -16,7 +16,8 @@ export function formatINR(paise: number | null | undefined, opts: { compact?: bo
 }
 
 /** percent from basis points, e.g. 1250 → "12.5%" */
-export const bpsToPercent = (bps: number) => `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 2).replace(/\.?0+$/, "")}%`;
+// Number() drops trailing decimal zeros (12.50 → 12.5) without touching whole numbers (20 stays 20).
+export const bpsToPercent = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
 
 /** Apply basis points to an amount, rounding half up to the nearest paisa. */
 export const applyBps = (amount: number, bps: number) => Math.round((amount * bps) / 10_000);

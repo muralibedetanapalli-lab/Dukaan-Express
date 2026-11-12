@@ -20,10 +20,12 @@ export default async function EarningsPage() {
   const { shop } = await activeShopFor(user);
   const settings = await getSettings();
   const rate = bpsToPercent(shop.commissionBps ?? settings.commission.defaultBps);
-  const [{ available, bank, open, payouts, paidOut }, recent] = await Promise.all([
+  const [{ available, bank, open, payouts, paidOut }, recent, dealer] = await Promise.all([
     payoutOverview(shop.id),
     db.commission.findMany({ where: { shopId: shop.id }, include: { order: { select: { orderNumber: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
+    shop.dealerId ? db.dealer.findUnique({ where: { id: shop.dealerId }, select: { user: { select: { name: true } } } }) : null,
   ]);
+  const dealerName = dealer?.user.name ?? null;
   const disabledReason = open
     ? null
     : !bank
@@ -62,17 +64,35 @@ export default async function EarningsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
               <div className="text-sm">
                 <p className="font-semibold">
-                  {formatINR(open.netPayable)} payout {open.status === "PENDING" ? "requested" : "processing"}
+                  {formatINR(open.netPayable)} payout{" "}
+                  {open.status === "DEALER_REVIEW"
+                    ? `waiting for ${dealerName ?? "your dealer"} to approve`
+                    : open.status === "PENDING"
+                      ? open.dealerReviewedAt
+                        ? "approved by your dealer"
+                        : "requested"
+                      : "processing"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {fmtDateTime(open.createdAt)} · {open.orderCount} orders · the admin will share transaction details once transferred
+                  {fmtDateTime(open.createdAt)} · {open.orderCount} orders ·{" "}
+                  {open.status === "DEALER_REVIEW" ? "once approved it goes to the platform for transfer" : "the admin will share transaction details once transferred"}
                 </p>
               </div>
-              {open.status === "PENDING" && open.requestedBy === "SHOP" && <CancelPayoutButton id={open.id} />}
+              {(open.status === "PENDING" || open.status === "DEALER_REVIEW") && open.requestedBy === "SHOP" && <CancelPayoutButton id={open.id} />}
             </div>
           ) : (
             <div>
-              <RequestPayoutButton amount={available.net} orders={available.orders} bank={bank} disabledReason={disabledReason} />
+              <RequestPayoutButton
+                amount={available.net}
+                orders={available.orders}
+                bank={bank}
+                disabledReason={disabledReason}
+                reviewer={
+                  dealerName
+                    ? `${dealerName} (your dealer) checks it first, then the admin transfers it and shares the transaction details here.`
+                    : undefined
+                }
+              />
             </div>
           )}
         </Card>
@@ -137,7 +157,12 @@ export default async function EarningsPage() {
                         )}
                       </div>
                     ) : p.status === "REJECTED" ? (
-                      <p className="text-red-600 dark:text-red-400">{p.rejectionReason}</p>
+                      <p className="text-red-600 dark:text-red-400">
+                        {p.dealerReviewedAt && p.dealerNote === p.rejectionReason ? "Declined by dealer: " : ""}
+                        {p.rejectionReason}
+                      </p>
+                    ) : p.dealerReviewedAt ? (
+                      <span className="text-muted-foreground">Approved by dealer {fmtDate(p.dealerReviewedAt)}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

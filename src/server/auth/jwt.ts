@@ -3,7 +3,10 @@ import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "dx_session";
 
-export type Role = "SUPER_ADMIN" | "SHOP_OWNER" | "CUSTOMER";
+export type Role = "SUPER_ADMIN" | "SHOP_OWNER" | "CUSTOMER" | "DEALER";
+
+/** Landing page for each role after login. */
+export const ROLE_HOME: Record<Role, string> = { SUPER_ADMIN: "/admin", SHOP_OWNER: "/shop", DEALER: "/dealer", CUSTOMER: "/" };
 
 export interface SessionClaims {
   sub: string; // user id

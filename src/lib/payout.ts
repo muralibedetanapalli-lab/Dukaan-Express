@@ -2,6 +2,7 @@ import type { Tone } from "@/components/shared/status-badge";
 
 /** Display metadata for payout (ShopSettlement) statuses — shared by shop and admin screens. */
 export const PAYOUT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  DEALER_REVIEW: { label: "With dealer", tone: "warning" },
   PENDING: { label: "Requested", tone: "warning" },
   PROCESSING: { label: "Processing", tone: "info" },
   PAID: { label: "Paid", tone: "success" },

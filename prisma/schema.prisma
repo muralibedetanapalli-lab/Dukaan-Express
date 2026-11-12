@@ -16,6 +16,7 @@ enum UserRole {
   SUPER_ADMIN
   SHOP_OWNER
   CUSTOMER
+  DEALER
 }
 
 enum UserStatus {
@@ -91,6 +92,7 @@ enum RefundStatus {
 }
 
 enum SettlementStatus {
+  DEALER_REVIEW // shop has a dealer: waits for the dealer to check and approve before reaching the admin
   PENDING // requested by the shop owner (or created by admin), awaiting transfer
   PROCESSING
   PAID
@@ -142,6 +144,7 @@ model User {
 
   customer      Customer?
   shopOwner     ShopOwner?
+  dealer        Dealer?
   notifications Notification[]
   deviceTokens  DeviceToken[]
   auditLogs     AuditLog[]
@@ -238,6 +241,8 @@ model Shop {
   rating             Float          @default(0)
   ratingCount        Int            @default(0)
   pickupLocationName String? // pickup nickname registered with Shiprocket
+  dealerId           String? // regional dealer who onboarded / manages this shop
+  dealer             Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   deletedAt          DateTime?
@@ -256,6 +261,7 @@ model Shop {
 
   @@index([approvalStatus, isActive])
   @@index([ownerId])
+  @@index([dealerId])
 }
 
 model ShopAddress {
@@ -749,45 +755,56 @@ model ShipmentTrackingEvent {
 // ───────────────────────────── Money ─────────────────────────────
 
 model Commission {
-  id           String          @id @default(cuid())
-  orderId      String          @unique
-  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  shopId       String
-  shop         Shop            @relation(fields: [shopId], references: [id])
-  baseAmount   Int // amount commission is charged on (items after coupon)
-  rateBps      Int
-  amount       Int
-  shopEarning  Int
-  settlementId String?
-  settlement   ShopSettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
-  createdAt    DateTime        @default(now())
+  id             String          @id @default(cuid())
+  orderId        String          @unique
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shopId         String
+  shop           Shop            @relation(fields: [shopId], references: [id])
+  baseAmount     Int // amount commission is charged on (items after coupon)
+  rateBps        Int
+  amount         Int
+  shopEarning    Int
+  settlementId   String?
+  settlement     ShopSettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  /// Dealer share of the platform commission (amount), fixed when the order is delivered.
+  dealerId       String?
+  dealer         Dealer?         @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  dealerAmount   Int             @default(0)
+  dealerPayoutId String?
+  dealerPayout   DealerPayout?   @relation(fields: [dealerPayoutId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
 
   @@index([shopId, createdAt])
   @@index([settlementId])
+  @@index([dealerId, dealerPayoutId])
 }
 
 model ShopSettlement {
-  id               String           @id @default(cuid())
-  shopId           String
-  shop             Shop             @relation(fields: [shopId], references: [id])
-  periodStart      DateTime
-  periodEnd        DateTime
-  orderCount       Int
-  grossSales       Int
-  commissionAmount Int
-  netPayable       Int
-  status           SettlementStatus @default(PENDING)
-  requestedBy      String? // "SHOP" (owner payout request) or "ADMIN"
-  requestedById    String? // user id
-  bankSnapshot     Json? // payout account at request time (account number masked)
-  reference        String? // bank UTR / transaction id
-  payoutMethod     String? // IMPS / NEFT / RTGS / UPI / OTHER
-  proofUrl         String? // receipt screenshot uploaded by admin
-  notes            String?
-  rejectionReason  String?
-  paidAt           DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                 String           @id @default(cuid())
+  shopId             String
+  shop               Shop             @relation(fields: [shopId], references: [id])
+  periodStart        DateTime
+  periodEnd          DateTime
+  orderCount         Int
+  grossSales         Int
+  commissionAmount   Int
+  netPayable         Int
+  status             SettlementStatus @default(PENDING)
+  requestedBy        String? // "SHOP" (owner payout request) or "ADMIN"
+  requestedById      String? // user id
+  bankSnapshot       Json? // payout account at request time (account number masked)
+  reference          String? // bank UTR / transaction id
+  payoutMethod       String? // IMPS / NEFT / RTGS / UPI / OTHER
+  proofUrl           String? // receipt screenshot uploaded by admin
+  notes              String?
+  rejectionReason    String?
+  dealerId           String? // dealer who reviews / reviewed this payout
+  dealerReviewedAt   DateTime?
+  dealerReviewedById String?
+  dealerNote         String?
+  paidAt             DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   commissions Commission[]
 
@@ -899,7 +916,12 @@ model ServiceArea {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
 
+  /// One dealer per region; a dealer can cover several regions.
+  dealerId String?
+  dealer   Dealer? @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+
   @@unique([city, state])
+  @@index([dealerId])
 }
 
 model IdempotencyKey {
@@ -944,4 +966,63 @@ model WebhookEvent {
 
   @@unique([provider, eventId])
   @@index([provider, createdAt])
+}
+
+// ───────────────────────────── Dealers ─────────────────────────────
+
+/// Regional dealer: onboards shops in their regions, reviews payout requests from those shops before
+/// they reach the admin, and earns a share of the platform commission on delivered orders.
+model Dealer {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commissionShareBps Int      @default(2000) // share of the platform commission, e.g. 2000 = 20%
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  regions     ServiceArea[]
+  shops       Shop[]
+  commissions Commission[]
+  payouts     DealerPayout[]
+  bankAccount DealerBankAccount?
+}
+
+/// Dealer asks for their commission share to be paid; the admin transfers it and records the UTR.
+model DealerPayout {
+  id              String           @id @default(cuid())
+  dealerId        String
+  dealer          Dealer           @relation(fields: [dealerId], references: [id])
+  orderCount      Int
+  amount          Int
+  status          SettlementStatus @default(PENDING)
+  requestedById   String?
+  bankSnapshot    Json?
+  reference       String?
+  payoutMethod    String?
+  proofUrl        String?
+  notes           String?
+  rejectionReason String?
+  paidAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  commissions Commission[]
+
+  @@index([dealerId, status])
+}
+
+/// Where a dealer wants payouts sent. The account number is AES-256-GCM encrypted at rest.
+model DealerBankAccount {
+  id                String   @id @default(cuid())
+  dealerId          String   @unique
+  dealer            Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  accountHolderName String
+  accountNumberEnc  String
+  accountLast4      String
+  ifsc              String
+  bankName          String?
+  upiId             String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

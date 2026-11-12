@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, verifySession, type Role } from "@/server/auth/jwt";
+import { ROLE_HOME as HOME, SESSION_COOKIE, verifySession, type Role } from "@/server/auth/jwt";
 
 /**
  * Page-level role routing (Next.js 16 "proxy", formerly middleware). This is a fast first line of
@@ -9,12 +9,11 @@ import { SESSION_COOKIE, verifySession, type Role } from "@/server/auth/jwt";
 const RULES: { prefix: string; roles: Role[]; login: string }[] = [
   { prefix: "/admin", roles: ["SUPER_ADMIN"], login: "/login/staff" },
   { prefix: "/shop", roles: ["SHOP_OWNER"], login: "/login/staff" },
+  { prefix: "/dealer", roles: ["DEALER"], login: "/login/staff" },
   { prefix: "/checkout", roles: ["CUSTOMER"], login: "/login" },
   { prefix: "/orders", roles: ["CUSTOMER"], login: "/login" },
   { prefix: "/account", roles: ["CUSTOMER"], login: "/login" },
 ];
-
-const HOME: Record<Role, string> = { SUPER_ADMIN: "/admin", SHOP_OWNER: "/shop", CUSTOMER: "/" };
 
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;

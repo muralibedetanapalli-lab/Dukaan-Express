@@ -87,7 +87,7 @@ export function CopyValue({ value, className }: { value: string; className?: str
 }
 
 /** Record the transfer: UTR, method, date, optional receipt screenshot and note. The shop sees all of it. */
-export function MarkPaid({ id, amount, shopName }: { id: string; amount?: number; shopName?: string }) {
+export function MarkPaid({ id, amount, shopName, base = "/admin/settlements" }: { id: string; amount?: number; shopName?: string; base?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [ref, setRef] = useState("");
@@ -147,7 +147,7 @@ export function MarkPaid({ id, amount, shopName }: { id: string; amount?: number
                 setBusy(true);
                 try {
                   const paidAt = date === today() ? new Date().toISOString() : new Date(`${date}T12:00:00`).toISOString();
-                  await api(`/admin/settlements/${id}`, { body: { reference: ref, payoutMethod: method, paidAt, notes: notes.trim() || null, proofUrl: proof[0] ?? null } });
+                  await api(`${base}/${id}`, { body: { reference: ref, payoutMethod: method, paidAt, notes: notes.trim() || null, proofUrl: proof[0] ?? null } });
                   toast.success("Payout recorded. The shop has been notified.");
                   setOpen(false);
                   router.refresh();
@@ -167,7 +167,7 @@ export function MarkPaid({ id, amount, shopName }: { id: string; amount?: number
   );
 }
 
-export function RejectPayout({ id }: { id: string }) {
+export function RejectPayout({ id, base = "/admin/settlements" }: { id: string; base?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -190,7 +190,7 @@ export function RejectPayout({ id }: { id: string }) {
             onClick={async () => {
               setBusy(true);
               try {
-                await api(`/admin/settlements/${id}/reject`, { body: { reason: reason.trim() } });
+                await api(`${base}/${id}/reject`, { body: { reason: reason.trim() } });
                 toast.success("Request declined");
                 setOpen(false);
                 router.refresh();

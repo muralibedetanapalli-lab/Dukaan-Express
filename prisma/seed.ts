@@ -465,7 +465,7 @@ async function main() {
       { title: "Pharmacy at your door", subtitle: "Medicines delivered 24×7", bgColor: "#6d28d9", linkUrl: "/search?category=medicines", sortOrder: 2 },
     ],
   });
-  await db.serviceArea.create({
+  const blr = await db.serviceArea.create({
     data: {
       city: "Bengaluru",
       state: "Karnataka",
@@ -642,10 +642,29 @@ async function main() {
     await db.commission.updateMany({ where: { id: { in: old.map((c) => c.id) } }, data: { settlementId: s.id } });
   }
 
+  // Regional dealer for Bengaluru managing two shops (earns 20% of platform commission on their orders)
+  const dealerUser = await db.user.create({
+    data: {
+      role: "DEALER",
+      name: "Deepak Rao",
+      email: "dealer@dukaanexpress.in",
+      phone: "9000000010",
+      passwordHash: await bcrypt.hash("Dealer@12345", 12),
+      dealer: { create: { commissionShareBps: 2000 } },
+    },
+    include: { dealer: true },
+  });
+  const dealerId = dealerUser.dealer!.id;
+  const dealerShops = [shopRows[1].id, shopRows[2].id];
+  await db.serviceArea.update({ where: { id: blr.id }, data: { dealerId } });
+  await db.shop.updateMany({ where: { id: { in: dealerShops } }, data: { dealerId } });
+  await db.$executeRaw`UPDATE "Commission" SET "dealerId" = ${dealerId}, "dealerAmount" = ROUND(amount * 0.2) WHERE "shopId" = ANY(${dealerShops})`;
+
   console.log(`✔ ${PRODUCTS.length} products, ${SHOPS.length} shops, ${seq} historical orders`);
   console.log("  Admin: admin@dukaanexpress.in / Admin@12345");
   console.log("  Shop owner: ravi@dukaanexpress.in / Owner@12345 (FreshMart + Sri Ganesh)");
   console.log("  Customer: priya@example.com (or 9876543210) / Customer@123");
+  console.log("  Dealer: dealer@dukaanexpress.in / Dealer@12345 (Bengaluru; Green Basket + 1 more)");
 }
 
 main()

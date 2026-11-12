@@ -13,6 +13,7 @@ export interface SessionUser {
   phone: string | null;
   customerId: string | null;
   shopOwnerId: string | null;
+  dealerId: string | null;
 }
 
 /** Resolve the current user from the session cookie (validated against the DB). */
@@ -26,7 +27,7 @@ export async function resolveToken(token: string | undefined): Promise<SessionUs
   if (!claims) return null;
   const user = await db.user.findUnique({
     where: { id: claims.sub },
-    include: { customer: { select: { id: true } }, shopOwner: { select: { id: true } } },
+    include: { customer: { select: { id: true } }, shopOwner: { select: { id: true } }, dealer: { select: { id: true } } },
   });
   if (!user || user.deletedAt || user.status !== "ACTIVE") return null;
   if (user.sessionVersion !== claims.sv || user.role !== claims.role) return null;
@@ -38,6 +39,7 @@ export async function resolveToken(token: string | undefined): Promise<SessionUs
     phone: user.phone,
     customerId: user.customer?.id ?? null,
     shopOwnerId: user.shopOwner?.id ?? null,
+    dealerId: user.dealer?.id ?? null,
   };
 }
 

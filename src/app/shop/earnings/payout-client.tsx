@@ -22,7 +22,25 @@ export interface BankViewDto {
 }
 
 /** "Request payout" for the whole available balance, with a confirmation that shows where the money goes. */
-export function RequestPayoutButton({ amount, orders, bank, disabledReason }: { amount: number; orders: number; bank: BankViewDto | null; disabledReason: string | null }) {
+export function RequestPayoutButton({
+  amount,
+  orders,
+  bank,
+  disabledReason,
+  endpoint = "/shop/payouts",
+  source = "after platform commission",
+  reviewer = "The admin will transfer it and share the transaction details here.",
+}: {
+  amount: number;
+  orders: number;
+  bank: BankViewDto | null;
+  disabledReason: string | null;
+  endpoint?: string;
+  /** What the amount is, e.g. "after platform commission". */
+  source?: string;
+  /** Who checks / pays the request. */
+  reviewer?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -37,12 +55,12 @@ export function RequestPayoutButton({ amount, orders, bank, disabledReason }: { 
           <AlertDialogHeader>
             <AlertDialogTitle>Request {formatINR(amount)}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Earnings from {orders} delivered {orders === 1 ? "order" : "orders"} after platform commission will be sent to{" "}
+              Earnings from {orders} delivered {orders === 1 ? "order" : "orders"} {source} will be sent to{" "}
               <b>
                 {bank?.accountHolderName} · {bank?.bankName ? `${bank.bankName} ` : ""}
                 {bank?.accountNumberMasked} ({bank?.ifsc})
               </b>
-              . The admin will transfer it and share the transaction details here.
+              . {reviewer}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -53,8 +71,8 @@ export function RequestPayoutButton({ amount, orders, bank, disabledReason }: { 
                 e.preventDefault();
                 setBusy(true);
                 try {
-                  await api("/shop/payouts", { method: "POST" });
-                  toast.success("Payout requested. The admin has been notified.");
+                  await api(endpoint, { method: "POST" });
+                  toast.success("Payout requested");
                   setOpen(false);
                   router.refresh();
                 } catch (err) {
@@ -73,7 +91,7 @@ export function RequestPayoutButton({ amount, orders, bank, disabledReason }: { 
   );
 }
 
-export function CancelPayoutButton({ id }: { id: string }) {
+export function CancelPayoutButton({ id, endpoint = `/shop/payouts/${id}/cancel` }: { id: string; endpoint?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   return (
@@ -84,7 +102,7 @@ export function CancelPayoutButton({ id }: { id: string }) {
       onClick={async () => {
         setBusy(true);
         try {
-          await api(`/shop/payouts/${id}/cancel`, { method: "POST" });
+          await api(endpoint, { method: "POST" });
           toast.success("Request cancelled");
           router.refresh();
         } catch (e) {
@@ -101,7 +119,7 @@ export function CancelPayoutButton({ id }: { id: string }) {
 
 const EMPTY = { accountHolderName: "", accountNumber: "", confirmAccountNumber: "", ifsc: "", bankName: "", upiId: "" };
 
-export function BankAccountCard({ bank, locked }: { bank: BankViewDto | null; locked: boolean }) {
+export function BankAccountCard({ bank, locked, endpoint = "/shop/bank-account" }: { bank: BankViewDto | null; locked: boolean; endpoint?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(EMPTY);
@@ -117,7 +135,7 @@ export function BankAccountCard({ bank, locked }: { bank: BankViewDto | null; lo
   async function save() {
     setBusy(true);
     try {
-      await api("/shop/bank-account", {
+      await api(endpoint, {
         method: "PATCH",
         body: { accountHolderName: v.accountHolderName, accountNumber: v.accountNumber, ifsc: v.ifsc, bankName: v.bankName || null, upiId: v.upiId || null },
       });

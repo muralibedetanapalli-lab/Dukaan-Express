@@ -2,8 +2,7 @@ import { z } from "zod";
 import { api } from "@/server/http";
 import { resetPassword } from "@/server/services/auth";
 import { createSessionCookie } from "@/server/auth/session";
-
-const HOME = { CUSTOMER: "/", SHOP_OWNER: "/shop", SUPER_ADMIN: "/admin" } as const;
+import { ROLE_HOME as HOME } from "@/server/auth/jwt";
 
 /** Set a new password with the emailed code, then sign in (other sessions are signed out). */
 export const POST = api(

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { db, type Tx } from "@/server/db";
 import { AppError, badRequest, conflict, forbidden, notFound } from "@/server/errors";
 import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
-import { formatINR } from "@/lib/money";
+import { applyBps, formatINR } from "@/lib/money";
 import type { Prisma, PaymentMethod } from "@/generated/prisma/client";
 import { canTransition, STOCK_RESERVED_STATUSES, type ActorRole } from "./order-state";
 import { computeQuote } from "./pricing";
@@ -345,6 +345,8 @@ export async function transitionOrder(orderId: string, to: OrderStatusKey, actor
         await tx.payment.updateMany({ where: { orderId, provider: "COD" }, data: { status: "CAPTURED", capturedAt: now } });
         await tx.order.update({ where: { id: orderId }, data: { paymentStatus: "CAPTURED" } });
       }
+      // The shop's regional dealer (if any) earns a share of the platform commission, fixed at delivery.
+      const dealer = (await tx.shop.findUnique({ where: { id: order.shopId }, select: { dealer: { select: { id: true, commissionShareBps: true } } } }))?.dealer;
       await tx.commission.upsert({
         where: { orderId },
         create: {
@@ -354,6 +356,8 @@ export async function transitionOrder(orderId: string, to: OrderStatusKey, actor
           rateBps: order.commissionBps,
           amount: order.commissionAmount,
           shopEarning: order.shopEarning,
+          dealerId: dealer?.id ?? null,
+          dealerAmount: dealer ? applyBps(order.commissionAmount, dealer.commissionShareBps) : 0,
         },
         update: {},
       });

@@ -11,6 +11,8 @@ import { ActionButton } from "@/components/admin/action-button";
 import { bpsToPercent, formatINR, toRupees } from "@/lib/money";
 import { fmtDateTime } from "@/lib/format";
 import { ShopForm } from "../shop-form";
+import { regionFor } from "@/server/services/dealer";
+import { ShopDealerCard } from "./shop-dealer";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
     },
   });
   if (!shop) notFound();
-  const [settings, categories, owners, perf, delivered, rejected, inventory, orders] = await Promise.all([
+  const [settings, categories, owners, perf, delivered, rejected, inventory, orders, dealers, areas] = await Promise.all([
     getSettings(),
     db.category.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     db.shopOwner.findMany({ where: { user: { deletedAt: null } }, include: { user: true } }),
@@ -40,7 +42,10 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
     db.order.count({ where: { shopId: id, status: "SHOP_REJECTED" } }),
     db.shopInventory.findMany({ where: { shopId: id, deletedAt: null }, include: { product: { include: { category: true } }, variant: true }, orderBy: { updatedAt: "desc" } }),
     db.order.findMany({ where: { shopId: id }, orderBy: { createdAt: "desc" }, take: 50 }),
+    db.dealer.findMany({ where: { user: { deletedAt: null, status: "ACTIVE" } }, include: { user: { select: { name: true } }, regions: { select: { city: true } } } }),
+    db.serviceArea.findMany({ where: { dealerId: { not: null } }, select: { id: true, city: true, pincodes: true, dealerId: true } }),
   ]);
+  const regionDealer = shop.address ? (regionFor(areas, shop.address) as (typeof areas)[number] | null)?.dealerId ?? null : null;
   const a = shop.address;
 
   return (
@@ -75,6 +80,12 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
             )}
           </>
         }
+      />
+      <ShopDealerCard
+        shopId={id}
+        dealerId={shop.dealerId}
+        suggested={regionDealer}
+        dealers={dealers.map((d) => ({ id: d.id, name: d.user.name ?? "Dealer", regions: d.regions.map((r) => r.city).join(", ") }))}
       />
       {shop.rejectionReason && shop.approvalStatus === "REJECTED" && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">Rejected: {shop.rejectionReason}</p>}
 

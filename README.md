@@ -6,6 +6,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 |---|---|---|
 | Customer app (mobile-first) | `/` | Customers (email or mobile + password; email verified at signup) |
 | Shop owner app (mobile-first) | `/shop` | Shop owners |
+| Dealer portal (mobile-first) | `/dealer` | Regional dealers: onboard shops in their regions, approve those shops' payout requests, earn a share of platform commission |
 | Super admin console | `/admin` | Platform admins |
 | Delivery & shipment management | `/admin/shipments`, the order pages, `/shop/orders/:id` | Admins and shops |
 | API docs (Swagger) | `/api-docs` | Developers |
@@ -62,6 +63,7 @@ Open http://localhost:3000.
 | Super admin | `admin@dukaanexpress.in` / `Admin@12345` at `/login/staff` |
 | Shop owner (FreshMart + Sri Ganesh) | `ravi@dukaanexpress.in` / `Owner@12345` |
 | Other shop owners | `anita@`, `suresh@`, `fatima@`, `manoj@dukaanexpress.in` / `Owner@12345` |
+| Dealer (Bengaluru; Green Basket + Wellness Pharmacy) | `dealer@dukaanexpress.in` / `Dealer@12345` at `/login/staff` |
 | Customers | `priya@example.com` (or `9876543210`) / `Customer@123` at `/login`. New customers sign up at `/signup`; with no SMTP configured the email code is shown on screen. |
 
 The seed creates 7 Bengaluru shops (one awaiting approval), 9 categories, 60 products sold by several shops at different prices, coupons (`WELCOME50`, `SAVE10`, `FRESH20`), banners, and 30 days of order history for the analytics.
@@ -143,3 +145,15 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 - **Webhooks:** Cashfree webhooks are HMAC-verified; Shiprocket webhooks are checked by token. Every inbound event is recorded and de-duplicated.
 - **Idempotency:** order placement takes an idempotency key; Shiprocket order creation is reconciled on retry so it is never duplicated.
 - **Audit trail:** admin and shop changes and every order transition are logged.
+
+## Dealers
+
+Admins create dealers in **Admin → Dealers** and give each one or more regions (service areas). Each region has at most one dealer.
+
+- **Onboarding.** A dealer onboards shops at `/dealer/shops/new`. The address must fall in one of their regions: the pincode must be listed for the region, or, if the region has no pincodes, the city must match. The shop and the owner's login are created together, and the shop goes live immediately.
+- **Payout approval.** When a shop with a dealer requests a payout, it starts in `DEALER_REVIEW`.
+  - The dealer approves it, and it moves to `PENDING`, the admin's queue in Commission & payouts, marked "Approved by …".
+  - Or the dealer declines it with a reason, and the orders go back to the shop's balance.
+  - The admin can't pay a payout before the dealer approves it, but can decline it at any time.
+- **Dealer earnings.** On each delivered order, the shop's dealer earns `commissionShareBps` of the platform commission, stored as `Commission.dealerAmount`. Dealers request this the same way shops do, and the admin pays it from Commission & payouts.
+- **Reassigning.** Admins can change a shop's dealer on the shop page. Requests waiting for review move to the new dealer, or straight to the admin if the shop no longer has a dealer.

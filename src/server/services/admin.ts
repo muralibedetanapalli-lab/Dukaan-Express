@@ -72,7 +72,7 @@ async function uniqueShopSlug(name: string, excludeId?: string) {
 
 const defaultHours = Array.from({ length: 7 }, (_, d) => ({ dayOfWeek: d, openTime: "07:00", closeTime: "23:00", isClosed: false }));
 
-export async function createShop(actor: SessionUser, input: ShopInput) {
+export async function createShop(actor: SessionUser, input: ShopInput, opts: { dealerId?: string; goLive?: boolean } = {}) {
   if (input.ownerId) await assertOwner(input.ownerId);
   const shop = await db.shop.create({
     data: {
@@ -89,9 +89,11 @@ export async function createShop(actor: SessionUser, input: ShopInput) {
       deliveryRadiusKm: input.deliveryRadiusKm,
       commissionBps: input.commissionBps ?? null,
       avgPrepMinutes: input.avgPrepMinutes,
-      // Shops created by an admin are approved but start inactive until explicitly activated.
+      // Admin-created shops are approved but start inactive until explicitly activated;
+      // shops onboarded by a dealer go live straight away.
       approvalStatus: "APPROVED",
-      isActive: false,
+      isActive: opts.goLive ?? false,
+      dealerId: opts.dealerId ?? null,
       address: { create: input.address },
       hours: { create: input.hours?.length ? input.hours : defaultHours },
       images: input.images ? { create: input.images.map((url, i) => ({ url, sortOrder: i })) } : undefined,
@@ -228,7 +230,7 @@ export async function updateOwner(
 }
 
 export async function resetPassword(actor: SessionUser, userId: string, newPassword?: string | null) {
-  const u = await db.user.findFirst({ where: { id: userId, role: { in: ["SHOP_OWNER", "SUPER_ADMIN"] } } });
+  const u = await db.user.findFirst({ where: { id: userId, role: { in: ["SHOP_OWNER", "SUPER_ADMIN", "DEALER"] } } });
   if (!u) throw notFound("User");
   const password = newPassword || temporaryPassword();
   if (!passwordPolicy.test(password)) throw badRequest(passwordPolicy.message);

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { api } from "@/server/http";
 import { staffLogin } from "@/server/services/auth";
 import { createSessionCookie } from "@/server/auth/session";
+import { ROLE_HOME } from "@/server/auth/jwt";
 
 export const POST = api(
   {
@@ -11,6 +12,6 @@ export const POST = api(
   async ({ body, ip }) => {
     const user = await staffLogin(body.email, body.password, ip);
     await createSessionCookie(user);
-    return { user: { id: user.id, name: user.name, role: user.role }, redirect: user.role === "SUPER_ADMIN" ? "/admin" : "/shop" };
+    return { user: { id: user.id, name: user.name, role: user.role }, redirect: ROLE_HOME[user.role] };
   },
 );
