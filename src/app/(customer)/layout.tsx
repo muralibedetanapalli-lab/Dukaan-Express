@@ -4,9 +4,11 @@ import { readLocationCookie, eligibleShops } from "@/server/services/location";
 import { getCartView } from "@/server/services/cart";
 import { CartProvider, type CartSummary } from "@/components/customer/cart-context";
 import { BottomNav, CustomerHeader, MobileCartBar } from "@/components/customer/header";
+import { SiteFooter } from "@/components/shared/site-footer";
+import { getSettings } from "@/server/services/settings";
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
-  const [user, loc] = await Promise.all([getSessionUser(), readLocationCookie()]);
+  const [user, loc, settings] = await Promise.all([getSessionUser(), readLocationCookie(), getSettings()]);
   const customer = user?.role === "CUSTOMER" ? user : null;
   const point = loc ? { lat: loc.lat, lng: loc.lng } : null;
 
@@ -28,7 +30,11 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       <Suspense>
         <CustomerHeader user={customer ? { name: customer.name } : null} location={loc} eta={eta} />
       </Suspense>
-      <main className="mx-auto max-w-7xl px-4 pt-4 pb-36 sm:pb-16">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 pt-4 pb-10 sm:pb-16">{children}</main>
+      {/* Extra bottom space on phones so the cart bar and bottom nav never cover the policy links. */}
+      <div className="pb-36 sm:pb-0">
+        <SiteFooter brand={settings.platform.name} entity={settings.legal.businessName || undefined} />
+      </div>
       <MobileCartBar />
       <BottomNav />
     </CartProvider>

@@ -64,7 +64,7 @@ flowchart LR
 | Concern | Decision |
 |---|---|
 | Hosting | Single Next.js app (Vercel). API routes are thin; all logic lives in `src/server/services` so it can be extracted to a standalone Node service later without rewrites. |
-| Auth | Stateless JWT (HS256 via `jose`) in an `httpOnly`, `SameSite=Lax` cookie; `sessionVersion` on the user lets admins revoke all sessions (password reset / deactivate). Staff log in with email + bcrypt password; customers with mobile + OTP (hashed, 5-minute TTL, attempt-limited). |
+| Auth | Stateless JWT (HS256 via `jose`) in an `httpOnly`, `SameSite=Lax` cookie; `sessionVersion` on the user lets admins revoke all sessions (password reset / deactivate). Everyone logs in with a bcrypt password: staff by email, customers by email or mobile number. Customers verify their email with a 6-digit code at signup (hashed, 10-minute TTL, single-use, attempt-limited); the signup call needs a 30-minute signed proof of that verification (separate JWT issuer, never valid as a session). Forgotten passwords are reset by an emailed code. SMS OTP login is currently disabled. |
 | RBAC | Roles `SUPER_ADMIN`, `SHOP_OWNER`, `CUSTOMER`. Enforced in **three** places: `proxy.ts` (page routing), `apiHandler({ roles })` (API), and services (ownership scoping — a shop owner query always filters by their `shopId`). |
 | Catalog model | `Product` (global master: name, category, images, attributes) is independent of `ShopInventory` (shop-specific price, MRP, stock, availability). The same product is sold by many shops at different prices. Variants are `ProductVariant`; inventory rows are per (shop, product, variant). |
 | Money | All amounts stored as integer **paise** (`Int`) — no floating point. Totals, discounts, taxes, delivery fees and commission are always computed server-side; client-submitted prices are ignored. |
@@ -155,7 +155,7 @@ sequenceDiagram
 │   ├── proxy.ts               role-based page routing (Next 16 "proxy")
 │   ├── app/
 │   │   ├── (customer)/        customer app: home, search, product, shop, cart, checkout, orders, account
-│   │   ├── login/             customer OTP login; /login/staff for admin & shop owner
+│   │   ├── login/             customer login; /login/staff for admin & shop owner; /signup, /forgot-password
 │   │   ├── shop/              shop owner app (mobile-first)
 │   │   ├── admin/             super admin dashboard
 │   │   ├── api-docs/          Swagger UI

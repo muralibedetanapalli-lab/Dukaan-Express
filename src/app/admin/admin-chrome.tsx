@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/shared/notification-bell";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { BrandName } from "@/components/shared/brand";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -73,7 +74,7 @@ export function AdminChrome({
         <span className="grid size-8 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
           <Zap className="size-4" />
         </span>
-        Dukaan Admin
+        <BrandName name="Dukaan Admin" />
       </Link>
       {NAV.map((n) => {
         const active = n.href === "/admin" ? path === "/admin" : path.startsWith(n.href);

@@ -126,18 +126,19 @@ model Role {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  role           UserRole
-  name           String?
-  email          String?    @unique
-  phone          String?    @unique
-  passwordHash   String?
-  status         UserStatus @default(ACTIVE)
-  sessionVersion Int        @default(0)
-  lastLoginAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
+  id              String     @id @default(cuid())
+  role            UserRole
+  name            String?
+  email           String?    @unique
+  phone           String?    @unique
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  status          UserStatus @default(ACTIVE)
+  sessionVersion  Int        @default(0)
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
 
   customer      Customer?
   shopOwner     ShopOwner?
@@ -159,6 +160,20 @@ model Otp {
   createdAt  DateTime  @default(now())
 
   @@index([phone, createdAt])
+}
+
+/// One-time codes sent by email: SIGNUP (verify the address before creating an account) and RESET (forgot password).
+model EmailCode {
+  id         String    @id @default(cuid())
+  email      String
+  purpose    String // SIGNUP | RESET
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose, createdAt])
 }
 
 model Customer {
@@ -872,17 +887,17 @@ model Banner {
 }
 
 model ServiceArea {
-  id        String   @id @default(cuid())
-  city      String
-  state     String
-  pincodes  String[]
+  id         String   @id @default(cuid())
+  city       String
+  state      String
+  pincodes   String[]
   /// [{ name, lat, lng, pincode }] — selectable areas for manual location selection
   localities Json     @default("[]")
-  centerLat Float?
-  centerLng Float?
-  radiusKm  Float?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  centerLat  Float?
+  centerLng  Float?
+  radiusKm   Float?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   @@unique([city, state])
 }

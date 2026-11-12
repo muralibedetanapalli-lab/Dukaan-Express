@@ -4,7 +4,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 
 | Interface | URL | Who |
 |---|---|---|
-| Customer app (mobile-first) | `/` | Customers (mobile + OTP login) |
+| Customer app (mobile-first) | `/` | Customers (email or mobile + password; email verified at signup) |
 | Shop owner app (mobile-first) | `/shop` | Shop owners |
 | Super admin console | `/admin` | Platform admins |
 | Delivery & shipment management | `/admin/shipments`, the order pages, `/shop/orders/:id` | Admins and shops |
@@ -62,7 +62,7 @@ Open http://localhost:3000.
 | Super admin | `admin@dukaanexpress.in` / `Admin@12345` at `/login/staff` |
 | Shop owner (FreshMart + Sri Ganesh) | `ravi@dukaanexpress.in` / `Owner@12345` |
 | Other shop owners | `anita@`, `suresh@`, `fatima@`, `manoj@dukaanexpress.in` / `Owner@12345` |
-| Customers | `9876543210` or `9123456780` at `/login`. With no SMS provider configured, the OTP is shown on screen. |
+| Customers | `priya@example.com` (or `9876543210`) / `Customer@123` at `/login`. New customers sign up at `/signup`; with no SMTP configured the email code is shown on screen. |
 
 The seed creates 7 Bengaluru shops (one awaiting approval), 9 categories, 60 products sold by several shops at different prices, coupons (`WELCOME50`, `SAVE10`, `FRESH20`), banners, and 30 days of order history for the analytics.
 
@@ -77,13 +77,14 @@ Every third-party integration uses an isolated sandbox adapter until you add its
   - Delivery pincode ending in `999`: no courier available, so you can exercise the shipment-exception and retry flow.
   - Delivery pincode ending in `998`: the create call times out once, so you can exercise the idempotent reconciliation.
 - **Maps:** haversine distance × 1.3 road factor.
-- **SMS:** OTP is logged and shown on screen (never in production).
+- **Email:** verification and password-reset codes are logged and shown on screen (in production only when `OTP_SANDBOX_IN_PRODUCTION=true`).
+- **SMS:** not used for login right now (SMS OTP login is switched off).
 - **Storage:** images are saved to `public/uploads`.
 - **FCM:** push is logged; in-app notifications and live updates (SSE) still work.
 
 ## End-to-end walkthrough
 
-1. **Customer** (`/login`, `9876543210`): pick a location (Koramangala), add items, check out with COD or UPI.
+1. **Customer** (`/login`, `priya@example.com` / `Customer@123`): pick a location (Koramangala), add items, check out with COD or UPI.
 2. **Shop owner** (`fatima@…` for the pharmacy): the new order arrives instantly with a sound. Then tap Accept Order → Start Preparing → Ready for Packing → Order Packed. The Shiprocket shipment is created automatically and the order becomes **Awaiting pickup**.
 3. Click **Simulate next courier update** to move it through Rider assigned → Picked up → Out for delivery → Delivered. The customer's timeline updates live.
 4. **Admin** (`/admin`): see the order, its shipment, payment and commission. Under *Commission & payouts*, handle payout requests (shop owners add a bank account and request their balance under *Earnings & payouts*; you transfer it and record the UTR and receipt) and download reports from *Reports*.
@@ -128,7 +129,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
   - webhook de-duplication
   - Cashfree webhook signatures
   - payment retry after failure
-  - OTP brute-force and reuse protection
+  - Email-code verification, signup, login and password-reset protection
   - staff login status checks
   - JWT tampering
 
@@ -136,7 +137,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 
 - **Server-side money:** prices, discounts, stock, totals and payment status are always recomputed or verified on the server. Stock is reserved with conditional atomic updates.
 - **Role checks in three layers:** the route proxy, every API handler, and the services, which scope data by ownership.
-- **Passwords and OTPs:** passwords use bcrypt (cost 12). OTPs are stored hashed, expire after 5 minutes, and are limited by attempts and send rate.
+- **Passwords and codes:** passwords use bcrypt (cost 12). Email verification and reset codes are stored hashed, expire after 10 minutes, are single-use, and are limited by attempts and send rate. Signup needs a short-lived signed proof that the email was verified.
 - **Sessions:** httpOnly SameSite cookies; deactivating a user or resetting a password revokes all their sessions.
 - **Input checks:** zod validation on every endpoint, uploads checked by magic bytes, and spreadsheet-injection-safe CSV exports.
 - **Webhooks:** Cashfree webhooks are HMAC-verified; Shiprocket webhooks are checked by token. Every inbound event is recorded and de-duplicated.

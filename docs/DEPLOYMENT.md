@@ -48,7 +48,10 @@ Each integration switches from its sandbox adapter to live automatically once it
 ### Firebase Cloud Messaging
 Create a service account with the *Firebase Cloud Messaging API* role → `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` (keep `\n` escapes). Web clients register tokens via `POST /api/v1/devices`. In-app notifications and SSE work without FCM.
 
-### SMS (OTP)
+### Email (SMTP)
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `EMAIL_FROM`. Sends signup verification and password-reset codes. Works with a Gmail App Password (`smtp.gmail.com`), Brevo (`smtp-relay.brevo.com`) or any SMTP service. Without it, codes are logged and shown on screen only when `NODE_ENV !== "production"` or `OTP_SANDBOX_IN_PRODUCTION=true`.
+
+### SMS (OTP, currently unused: SMS login is switched off)
 `SMS_PROVIDER=msg91`, `SMS_API_KEY`, `SMS_TEMPLATE_ID` (DLT-approved template). Without it, OTPs are printed to the server log and shown on the login screen **only when `NODE_ENV !== "production"`**.
 
 ## 4. Security checklist

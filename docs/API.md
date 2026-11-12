@@ -2,13 +2,13 @@
 
 - Base URL: `/api/v1`
 - Interactive docs (Swagger UI): **`/api-docs`** — OpenAPI 3.1 JSON at `/api/v1/openapi.json` (request bodies generated from the real zod validators).
-- Auth: httpOnly session cookie `dx_session` (JWT, HS256) set by `/auth/otp/verify` (customers) or `/auth/staff/login` (admins, shop owners).
+- Auth: httpOnly session cookie `dx_session` (JWT, HS256) set by `/auth/signup` or `/auth/login` (customers), `/auth/staff/login` (admins, shop owners) or `/auth/password/reset`.
 - Success envelope: `{ "data": … }` · Error envelope: `{ "error": { "code", "message", "details" } }`
 - Money is always integer **paise**.
 
 | Module | Endpoints |
 |---|---|
-| Authentication | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/staff/login`, `POST /auth/logout`, `GET/PATCH /auth/me`, `POST /auth/password` |
+| Authentication | `POST /auth/signup/send-code`, `POST /auth/signup/verify-code`, `POST /auth/signup`, `POST /auth/login`, `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/staff/login`, `POST /auth/logout`, `GET/PATCH /auth/me`, `POST /auth/password` |
 | Location | `POST /location`, `GET /location/reverse`, `GET /location/areas` |
 | Catalog | `GET /catalog/home`, `GET /catalog/products`, `GET /catalog/products/:slug`, `GET /catalog/shops`, `GET /catalog/shops/:slug`, `GET /catalog/categories` |
 | Cart | `GET/POST/PATCH/DELETE /cart`, `GET /coupons` |

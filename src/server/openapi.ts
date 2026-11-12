@@ -22,8 +22,13 @@ const phone = z.object({ phone: z.string().describe("10-digit Indian mobile") })
 
 const E: Ep[] = [
   // Auth
-  { m: "post", p: "/auth/otp/request", tag: "Authentication", s: "Request a login OTP (customers)", body: phone },
-  { m: "post", p: "/auth/otp/verify", tag: "Authentication", s: "Verify OTP, create account if new, set session cookie", body: phone.extend({ otp: z.string(), name: z.string().optional(), email: z.string().optional() }) },
+  { m: "post", p: "/auth/signup/send-code", tag: "Authentication", s: "Signup step 1: email a 6-digit verification code", body: z.object({ email: z.string() }) },
+  { m: "post", p: "/auth/signup/verify-code", tag: "Authentication", s: "Signup step 2: verify the code, returns verificationToken (30 min)", body: z.object({ email: z.string(), code: z.string() }) },
+  { m: "post", p: "/auth/signup", tag: "Authentication", s: "Signup step 3: create customer account (verified email, mobile, password) and sign in", body: phone.extend({ name: z.string(), email: z.string(), password: z.string(), verificationToken: z.string() }) },
+  { m: "post", p: "/auth/login", tag: "Authentication", s: "Customer login with email or mobile number + password", body: z.object({ identifier: z.string(), password: z.string() }) },
+  { m: "post", p: "/auth/password/forgot", tag: "Authentication", s: "Email a password reset code (any role)", body: z.object({ email: z.string() }) },
+  { m: "post", p: "/auth/password/reset", tag: "Authentication", s: "Set a new password with the emailed code and sign in", body: z.object({ email: z.string(), code: z.string(), newPassword: z.string() }) },
+  { m: "post", p: "/auth/otp/request", tag: "Authentication", s: "Disabled (410): SMS OTP login is switched off", body: phone },
   { m: "post", p: "/auth/staff/login", tag: "Authentication", s: "Admin / shop-owner email + password login", body: z.object({ email: z.string(), password: z.string() }) },
   { m: "post", p: "/auth/logout", tag: "Authentication", s: "Clear the session" },
   { m: "get", p: "/auth/me", tag: "Authentication", s: "Current user" },

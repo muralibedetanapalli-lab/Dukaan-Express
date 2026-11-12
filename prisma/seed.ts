@@ -4,7 +4,7 @@
  * Test credentials (development only — change in any shared environment):
  *   Super admin   admin@dukaanexpress.in      / Admin@12345
  *   Shop owners   <owner>@dukaanexpress.in    / Owner@12345   (see OWNERS below)
- *   Customers     9876543210, 9123456780      (OTP login; in sandbox mode the OTP is shown on screen)
+ *   Customers     priya@example.com / 9876543210, arjun@example.com / 9123456780   / Customer@123
  */
 import "dotenv/config";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -420,6 +420,7 @@ async function main() {
 
   // Customers
   const customers = [];
+  const customerPw = await bcrypt.hash("Customer@123", 12);
   for (const c of [
     { name: "Priya Nair", phone: "9876543210", email: "priya@example.com", addr: { label: "Home", line1: "Flat 402, Prestige Acropolis, 20th Main", landmark: "Near Forum Mall", pincode: "560034", lat: 12.9339, lng: 77.6229 } },
     { name: "Arjun Mehta", phone: "9123456780", email: "arjun@example.com", addr: { label: "Home", line1: "12, 3rd Cross, Domlur Layout", landmark: "Opp. Domlur Park", pincode: "560071", lat: 12.9609, lng: 77.6387 } },
@@ -430,6 +431,8 @@ async function main() {
         name: c.name,
         phone: c.phone,
         email: c.email,
+        passwordHash: customerPw,
+        emailVerifiedAt: new Date(),
         customer: {
           create: {
             cart: { create: {} },
@@ -642,7 +645,7 @@ async function main() {
   console.log(`✔ ${PRODUCTS.length} products, ${SHOPS.length} shops, ${seq} historical orders`);
   console.log("  Admin: admin@dukaanexpress.in / Admin@12345");
   console.log("  Shop owner: ravi@dukaanexpress.in / Owner@12345 (FreshMart + Sri Ganesh)");
-  console.log("  Customer: 9876543210 (OTP shown on screen in sandbox mode)");
+  console.log("  Customer: priya@example.com (or 9876543210) / Customer@123");
 }
 
 main()

@@ -20,7 +20,7 @@ export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
 
-  if (pathname === "/login" || pathname === "/login/staff") {
+  if (pathname === "/login" || pathname === "/login/staff" || pathname === "/signup") {
     if (session) return NextResponse.redirect(new URL(HOME[session.role], req.url));
     return NextResponse.next();
   }

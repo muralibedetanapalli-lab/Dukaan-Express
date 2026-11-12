@@ -38,6 +38,13 @@ const schema = z.object({
   CLOUDINARY_CLOUD_NAME: blank,
   CLOUDINARY_API_KEY: blank,
   CLOUDINARY_API_SECRET: blank,
+
+  // Outgoing email (verification codes, password resets). Any SMTP server: Gmail app password, Brevo, Zoho, etc.
+  SMTP_HOST: blank,
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: blank,
+  SMTP_PASS: blank,
+  EMAIL_FROM: blank, // e.g. "Dukaan Express <no-reply@yourdomain.in>"; defaults to SMTP_USER
 });
 
 export type Env = z.infer<typeof schema>;
@@ -66,5 +73,6 @@ export function integrationModes() {
     fcm: e.FCM_PROJECT_ID && e.FCM_CLIENT_EMAIL && e.FCM_PRIVATE_KEY ? "live" : "mock",
     sms: e.SMS_PROVIDER && e.SMS_API_KEY ? "live" : "mock",
     storage: e.CLOUDINARY_CLOUD_NAME && e.CLOUDINARY_API_KEY && e.CLOUDINARY_API_SECRET ? "live" : "mock",
+    email: e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS ? "live" : "mock",
   } as const;
 }

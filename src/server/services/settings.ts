@@ -85,6 +85,19 @@ export const settingsSchema = z.object({
       maxDiscountPercentOfOrder: z.number().int().min(0).max(100).default(50),
     })
     .prefault({}),
+  // Business identity shown on the policy pages (required by the Consumer Protection (E-Commerce) Rules, 2020).
+  legal: z
+    .object({
+      businessName: z.string().max(120).default(""), // registered legal name, e.g. "Dukaan Express Private Limited"
+      registeredAddress: z.string().max(300).default(""),
+      gstin: z.string().max(15).default(""),
+      grievanceOfficerName: z.string().max(80).default(""),
+      grievanceOfficerEmail: z.string().max(120).default(""),
+      grievanceOfficerPhone: z.string().max(20).default(""),
+      jurisdictionCity: z.string().max(60).default("Bengaluru"),
+      policiesUpdatedOn: z.string().max(20).default("2026-11-11"), // YYYY-MM-DD
+    })
+    .prefault({}),
 });
 
 export type PlatformSettings = z.infer<typeof settingsSchema>;

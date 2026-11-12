@@ -1,8 +1,6 @@
-import { z } from "zod";
-import { api, zPhone } from "@/server/http";
-import { requestOtp } from "@/server/services/auth";
+import { NextResponse } from "next/server";
 
-export const POST = api(
-  { body: z.object({ phone: zPhone }), rateLimit: { name: "otp-request", limit: 5 } },
-  async ({ body }) => requestOtp(body.phone),
-);
+/** SMS OTP login is switched off for now: customers sign up and log in with email + password (see /auth/signup, /auth/login). */
+export function POST() {
+  return NextResponse.json({ error: { code: "GONE", message: "OTP login is disabled. Please log in with your email or mobile number and password." } }, { status: 410 });
+}

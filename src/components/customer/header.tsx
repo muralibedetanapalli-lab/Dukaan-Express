@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Home, LayoutGrid, Package, Search, ShoppingBag, User, Zap } from "lucide-react";
+import { BrandName } from "@/components/shared/brand";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ export function CustomerHeader({ user, location, eta }: Props) {
           <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
             <Zap className="size-4" />
           </span>
-          <span className="hidden lg:inline">Dukaan Express</span>
+          <BrandName className="hidden lg:inline-flex" poweredClassName="text-muted-foreground opacity-100" />
         </Link>
         <div className="min-w-0 flex-1 sm:max-w-56 sm:flex-none">
           <LocationPicker current={location} loggedIn={!!user} eta={eta} />

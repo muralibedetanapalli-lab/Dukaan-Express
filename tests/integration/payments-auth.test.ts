@@ -2,7 +2,17 @@ import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { handleCashfreeWebhook, verifyPayment, startPayment } from "@/server/services/payment";
-import { requestOtp, verifyOtpAndLogin, staffLogin } from "@/server/services/auth";
+import {
+  customerLogin,
+  requestOtp,
+  resetPassword,
+  sendPasswordResetCode,
+  sendSignupCode,
+  signupCustomer,
+  staffLogin,
+  verifyOtpAndLogin,
+  verifySignupCode,
+} from "@/server/services/auth";
 import { hashPassword } from "@/server/auth/password";
 import { signSession, verifySession } from "@/server/auth/jwt";
 import { addToCart } from "@/server/services/cart";
@@ -102,6 +112,65 @@ describe("authentication", () => {
     expect((await staffLogin("O@T.in", "Secret123", "ip")).role).toBe("SHOP_OWNER");
     await db.user.update({ where: { email: "o@t.in" }, data: { status: "INACTIVE" } });
     await expect(staffLogin("o@t.in", "Secret123", "ip")).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("signup needs a verified email; then login works with email or mobile + password", async () => {
+    const base = { name: "Meera", phone: "9812345670", email: "Meera@Example.com", password: "Secret123" };
+    // No verification at all → rejected.
+    await expect(signupCustomer({ ...base, verificationToken: "not-a-token" }, "ip")).rejects.toMatchObject({ status: 400 });
+
+    const sent = await sendSignupCode(base.email);
+    expect(sent.devCode).toMatch(/^\d{6}$/);
+    await expect(verifySignupCode(base.email, sent.devCode === "000000" ? "111111" : "000000")).rejects.toMatchObject({ message: "Incorrect code" });
+    const { verificationToken } = await verifySignupCode("meera@example.com", sent.devCode!);
+    await expect(verifySignupCode(base.email, sent.devCode!)).rejects.toBeTruthy(); // single use
+
+    // A token for one email can't create an account for another, and a session token is never accepted as proof.
+    await expect(signupCustomer({ ...base, email: "other@example.com", verificationToken }, "ip")).rejects.toMatchObject({ status: 400 });
+    const session = await signSession({ sub: "meera@example.com", role: "CUSTOMER", sv: 0 }, 1);
+    await expect(signupCustomer({ ...base, verificationToken: session }, "ip")).rejects.toMatchObject({ status: 400 });
+    await expect(signupCustomer({ ...base, password: "short", verificationToken }, "ip")).rejects.toMatchObject({ status: 400 });
+
+    const user = await signupCustomer({ ...base, verificationToken }, "ip");
+    expect(user).toMatchObject({ role: "CUSTOMER", email: "meera@example.com", phone: "9812345670" });
+    expect(user.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(await db.cart.count({ where: { customer: { userId: user.id } } })).toBe(1);
+
+    await expect(sendSignupCode(base.email)).rejects.toMatchObject({ status: 409 }); // already registered
+
+    expect((await customerLogin("MEERA@example.com", "Secret123", "ip")).id).toBe(user.id);
+    expect((await customerLogin("+91 98123 45670", "Secret123", "ip")).id).toBe(user.id);
+    await expect(customerLogin("meera@example.com", "wrong123", "ip")).rejects.toMatchObject({ status: 401 });
+
+    // Staff accounts can't use the customer login.
+    await db.user.create({ data: { role: "SHOP_OWNER", email: "s@t.in", passwordHash: await hashPassword("Secret123"), shopOwner: { create: {} } } });
+    await expect(customerLogin("s@t.in", "Secret123", "ip")).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("mobile number must be unique at signup", async () => {
+    await db.user.create({ data: { role: "CUSTOMER", phone: "9812345670", customer: { create: { cart: { create: {} } } } } });
+    const sent = await sendSignupCode("new@example.com");
+    const { verificationToken } = await verifySignupCode("new@example.com", sent.devCode!);
+    await expect(
+      signupCustomer({ name: "New", phone: "9812345670", email: "new@example.com", password: "Secret123", verificationToken }, "ip"),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("password reset by email code signs out old sessions and doesn't reveal unknown emails", async () => {
+    const u = await db.user.create({
+      data: { role: "CUSTOMER", email: "r@example.com", phone: "9898989898", passwordHash: await hashPassword("OldPass123"), customer: { create: { cart: { create: {} } } } },
+    });
+    const unknown = await sendPasswordResetCode("nobody@example.com");
+    expect(unknown.sent).toBe(true);
+    expect(unknown.devCode).toBeUndefined();
+
+    const r = await sendPasswordResetCode("r@example.com");
+    await expect(resetPassword("r@example.com", r.devCode!, "weak", "ip")).rejects.toMatchObject({ status: 400 });
+    const updated = await resetPassword("r@example.com", r.devCode!, "NewPass123", "ip");
+    expect(updated.sessionVersion).toBe(u.sessionVersion + 1);
+    await expect(customerLogin("r@example.com", "OldPass123", "ip")).rejects.toMatchObject({ status: 401 });
+    expect((await customerLogin("r@example.com", "NewPass123", "ip")).id).toBe(u.id);
+    await expect(resetPassword("r@example.com", r.devCode!, "Another123", "ip")).rejects.toBeTruthy(); // single use
   });
 
   it("session tokens are signed and tamper-evident", async () => {

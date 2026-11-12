@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -106,6 +107,20 @@ export function ShopSettingsClient({ shop }: { shop: { name: string; avgPrepMinu
             {pwBusy && <Loader2 className="animate-spin" />} Update password
           </Button>
         </form>
+      </Card>
+      <Card className="gap-2 p-4">
+        <p className="font-semibold">Policies</p>
+        <p className="text-sm text-muted-foreground">
+          Selling on the platform is covered by the{" "}
+          <Link href="/legal/seller-terms" className="font-medium text-primary hover:underline">
+            Seller Terms
+          </Link>
+          {" "}(commission, payouts, order handling) and the{" "}
+          <Link href="/legal/privacy" className="font-medium text-primary hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </Card>
     </div>
   );

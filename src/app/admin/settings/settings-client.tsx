@@ -121,6 +121,20 @@ const GROUPS: { key: string; label: string; fields: Field[] }[] = [
       { key: "maxDiscountPercentOfOrder", label: "Max coupon discount (% of order)", kind: "int" },
     ],
   },
+  {
+    key: "legal",
+    label: "Legal & business",
+    fields: [
+      { key: "businessName", label: "Registered business name", kind: "text", hint: "Shown on Terms, Privacy and Contact pages, e.g. Dukaan Express Private Limited" },
+      { key: "registeredAddress", label: "Registered address", kind: "text" },
+      { key: "gstin", label: "GSTIN (optional)", kind: "text" },
+      { key: "grievanceOfficerName", label: "Grievance officer name", kind: "text", hint: "Required for e-commerce platforms in India" },
+      { key: "grievanceOfficerEmail", label: "Grievance officer email", kind: "text" },
+      { key: "grievanceOfficerPhone", label: "Grievance officer phone", kind: "text" },
+      { key: "jurisdictionCity", label: "Courts of (city) for disputes", kind: "text" },
+      { key: "policiesUpdatedOn", label: "Policies last updated (YYYY-MM-DD)", kind: "text" },
+    ],
+  },
 ];
 
 const CANCELLABLE = ["PAYMENT_PENDING", "PAYMENT_CONFIRMED", "SHOP_PENDING", "SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING"];
