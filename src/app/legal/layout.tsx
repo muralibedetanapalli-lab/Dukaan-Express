@@ -5,6 +5,9 @@ import { BrandName } from "@/components/shared/brand";
 import { LegalNav } from "./legal-nav";
 import { legalContext, POLICIES } from "./_lib/context";
 
+// Business details come from admin settings (DB), so render per request — there is no DB at image build time.
+export const dynamic = "force-dynamic";
+
 /** Public policy pages: readable by everyone (customers, shop owners, payment-gateway and app-store reviewers), no login. */
 export default async function LegalLayout({ children }: { children: React.ReactNode }) {
   const c = await legalContext();
