@@ -9,7 +9,7 @@ flowchart LR
   subgraph VNET[synchealth-vnet]
     subgraph SA[snet-apps /27 — new]
       APP[Container App dukaan-app<br/>0–2 replicas, scale to zero]
-      CRON[Job dukaan-cron<br/>every 15 min]
+      CRON[Job dukaan-cron<br/>every 6 h, safety net]
       SETUP[Job dukaan-setup<br/>manual]
     end
     subgraph SD[snet-data — existing]
@@ -141,9 +141,11 @@ The setup creates roles and the default categories only. Add your service areas/
 
 ## 6. Maintenance job (expires unpaid orders, auto-rejects ignored orders, reconciles shipments)
 
+The app also runs this maintenance **itself** while it is awake: shortly after start-up and every 5 minutes (`src/instrumentation.ts`, needs `CRON_SECRET`). With scale-to-zero (min replicas 0) that means pending work is handled as soon as anyone uses the app, so the job below is only a safety net and runs every 6 hours. Each job run wakes the app, so a frequent schedule (e.g. every 15 min) keeps it running most of the day and uses up the free monthly allowance. When you move to always-on (min replicas 1) the in-process timer alone is enough.
+
 ```bash
 az containerapp job create -g $RG -n dukaan-cron --environment $CAE --workload-profile-name Consumption \
-  --trigger-type Schedule --cron-expression "*/15 * * * *" --replica-timeout 120 --replica-retry-limit 1 \
+  --trigger-type Schedule --cron-expression "0 */6 * * *" --replica-timeout 120 --replica-retry-limit 1 \
   --image "$IMAGE" --cpu 0.25 --memory 0.5Gi \
   --secrets cron-secret="$CRON" \
   --env-vars APP_URL="https://$FQDN" CRON_SECRET=secretref:cron-secret \

@@ -12,7 +12,8 @@ import { createShipmentForOrder } from "@/server/services/shipment";
 export const runtime = "nodejs";
 
 /**
- * Periodic maintenance (Azure Container Apps job, every 15 min): expire unpaid orders (after re-checking
+ * Periodic maintenance (in-process timer every 5 min while the app is awake — see src/instrumentation.ts — plus an
+ * Azure Container Apps job every 6 h as a safety net): expire unpaid orders (after re-checking
  * Cashfree), settle refunds whose webhook was missed, auto-reject orders a shop
  * ignored, reconcile shipments stuck in SHIPMENT_CREATING, and prune old OTPs / idempotency keys.
  * Protected by `Authorization: Bearer ${CRON_SECRET}`.

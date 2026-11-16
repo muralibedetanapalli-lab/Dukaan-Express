@@ -100,14 +100,14 @@ Welcome to Dukaan Express! Order groceries and essentials from shops near you, p
 Dukaan Partner
 ```
 
-**Short description** (70 characters)
+**Short description** (80 max — this is 75)
 ```
-Sell on Dukaan Express: take online orders, manage stock and get paid.
+For Dukaan Express shops & dealers: take orders, manage stock and get paid.
 ```
 
 **Full description**
 ```
-Dukaan Partner is the app for shops that sell on Dukaan Express. Take orders from customers in your area, keep your stock up to date and track your earnings — all from your phone.
+Dukaan Partner is the app for shops and regional dealers on Dukaan Express. Take orders from customers in your area, keep your stock up to date and track your earnings — all from your phone.
 
 NEVER MISS AN ORDER
 • A loud "New order" alert the moment a customer orders, even when the app is closed
@@ -126,7 +126,13 @@ GET PAID WHEN YOU WANT
 • Request a payout to your bank account any time
 • Track every payout with its bank reference number
 
-Dukaan Partner is for registered sellers on Dukaan Express. To start selling, contact the Dukaan Express team to get your shop approved.
+FOR DEALERS
+• Onboard new shops in your region — they go live right away
+• See sales and orders for every shop you manage
+• Check and approve your shops' payout requests
+• Earn a share of the commission on your shops' delivered orders, and request payouts any time
+
+Dukaan Partner is for registered sellers and dealers on Dukaan Express. To start selling, contact the Dukaan Express team or your local dealer.
 ```
 
 **Release notes**
