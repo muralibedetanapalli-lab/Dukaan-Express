@@ -494,7 +494,7 @@ async function main() {
       email: "rider@dukaanexpress.in",
       phone: "9000000020",
       passwordHash: await bcrypt.hash("Rider@12345", 12),
-      rider: { create: { vehicleType: "BIKE", vehicleNumber: "KA01EX1234", lat: 12.9352, lng: 77.6245, locationAt: new Date() } },
+      rider: { create: { vehicleType: "BIKE", vehicleNumber: "KA01EX1234", kycStatus: "APPROVED", lat: 12.9352, lng: 77.6245, locationAt: new Date() } },
     },
     include: { rider: true },
   });

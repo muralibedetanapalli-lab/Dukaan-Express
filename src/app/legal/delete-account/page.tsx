@@ -50,6 +50,14 @@ export default async function DeleteAccountPage() {
         </p>
       </Section>
 
+      <Section title="Riders (Dukaan Rider app)">
+        <p>
+          Email <Mail to={c.supportEmail} /> from your registered email with the subject <b>&quot;Delete my rider account&quot;</b>. We pay out any wallet balance you are owed (or settle cash
+          you collected) first, then delete your account, your Aadhaar number and your document photos (Aadhaar, driving licence, RC) within 30 days. Records of deliveries and payments are kept
+          as described below.
+        </p>
+      </Section>
+
       <Section title="What is deleted">
         <List>
           <li>Your name, email address, mobile number and password</li>

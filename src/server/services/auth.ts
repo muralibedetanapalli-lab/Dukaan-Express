@@ -156,16 +156,21 @@ export async function verifySignupCode(rawEmail: string, code: string) {
 }
 
 /** Signup step 3: create the customer account. Needs the proof from step 2 for the same email. */
-export async function signupCustomer(input: { name: string; phone: string; email: string; password: string; verificationToken: string }, ip: string) {
-  const email = normaliseEmail(input.email);
+/** Throws unless `token` (from verifySignupCode) proves ownership of `email`. Shared by customer and rider signup. */
+export async function assertVerifiedEmail(email: string, token: string) {
   let verifiedEmail: string | undefined;
   try {
-    const { payload } = await jwtVerify(input.verificationToken, tokenKey(), { issuer: SIGNUP_TOKEN_ISSUER, algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, tokenKey(), { issuer: SIGNUP_TOKEN_ISSUER, algorithms: ["HS256"] });
     if (payload.purpose === "signup") verifiedEmail = payload.sub;
   } catch {
     // invalid or expired: handled below
   }
-  if (verifiedEmail !== email) throw badRequest("Email verification expired. Please verify your email again.");
+  if (verifiedEmail !== normaliseEmail(email)) throw badRequest("Email verification expired. Please verify your email again.");
+}
+
+export async function signupCustomer(input: { name: string; phone: string; email: string; password: string; verificationToken: string }, ip: string) {
+  const email = normaliseEmail(input.email);
+  await assertVerifiedEmail(email, input.verificationToken);
   if (!passwordPolicy.test(input.password)) throw badRequest(passwordPolicy.message);
 
   const [byEmail, byPhone] = await Promise.all([

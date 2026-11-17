@@ -95,7 +95,7 @@ export async function offerToRiders(shipmentId: string) {
   const settings = await getSettings();
   const shopPoint = { lat: s.order.shop.address.latitude, lng: s.order.shop.address.longitude };
   const riders = await db.rider.findMany({
-    where: { isOnline: true, user: { status: "ACTIVE", deletedAt: null }, lat: { not: null }, locationAt: { gte: new Date(Date.now() - LOCATION_FRESH_MS) } },
+    where: { isOnline: true, kycStatus: "APPROVED", user: { status: "ACTIVE", deletedAt: null }, lat: { not: null }, locationAt: { gte: new Date(Date.now() - LOCATION_FRESH_MS) } },
     select: { id: true, userId: true, lat: true, lng: true, deliveries: { where: { status: { in: [...ACTIVE_RIDER_STATUSES] } }, select: { id: true } } },
   });
   const near = riders.filter((r) => !r.deliveries.length && haversineKm(shopPoint, { lat: r.lat!, lng: r.lng! }) <= settings.delivery.riderSearchRadiusKm);
@@ -118,6 +118,7 @@ export async function offerToRiders(shipmentId: string) {
 /** Open jobs near the rider (or all open jobs if the rider hasn't shared a location yet). */
 export async function availableJobs(riderId: string) {
   const rider = await db.rider.findUniqueOrThrow({ where: { id: riderId } });
+  if (rider.kycStatus !== "APPROVED") return [];
   const settings = await getSettings();
   const jobs = await db.shipment.findMany({
     where: { status: "CREATED", riderId: null, mode: "RIDER" },
@@ -167,6 +168,7 @@ export async function activeDelivery(riderId: string) {
 export async function acceptJob(user: SessionUser, shipmentId: string) {
   const riderId = requireRider(user);
   const rider = await db.rider.findUniqueOrThrow({ where: { id: riderId } });
+  if (rider.kycStatus !== "APPROVED") throw badRequest("Your documents must be approved before you can deliver");
   if (!rider.isOnline) throw badRequest("Go online to accept deliveries");
   if (await db.shipment.findFirst({ where: { riderId, status: { in: [...ACTIVE_RIDER_STATUSES] } }, select: { id: true } })) {
     throw conflict("Finish your current delivery first");
@@ -337,7 +339,7 @@ export async function adminAssignRider(user: SessionUser, orderId: string, rider
   const order = await loadOrder(orderId);
   if (order.status !== "SHIPMENT_CREATED" || order.shipment?.status !== "CREATED") throw conflict("This order isn't waiting for a rider");
   const rider = await db.rider.findUnique({ where: { id: riderId }, include: { user: true } });
-  if (!rider || rider.user.status !== "ACTIVE") throw notFound("Rider");
+  if (!rider || rider.user.status !== "ACTIVE" || rider.kycStatus !== "APPROVED") throw notFound("Rider");
   if (await db.shipment.findFirst({ where: { riderId, status: { in: [...ACTIVE_RIDER_STATUSES] } }, select: { id: true } })) throw conflict("This rider is busy with another delivery");
   const actor: OrderActor = { id: user.id, role: "SUPER_ADMIN" };
   await db.$transaction(async (tx) => {

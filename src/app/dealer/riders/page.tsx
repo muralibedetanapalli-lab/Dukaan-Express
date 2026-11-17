@@ -3,6 +3,7 @@ import { riderRows } from "@/server/services/rider-list";
 import { PageHeader } from "@/components/shared/misc";
 import { AddRiderButton } from "@/components/shared/rider-dialog";
 import { RidersTable } from "@/components/shared/riders-table";
+import { PendingRiderReviews } from "@/components/shared/rider-kyc-review";
 
 export const metadata = { title: "Riders" };
 
@@ -14,9 +15,10 @@ export default async function DealerRidersPage() {
     <div>
       <PageHeader
         title="Riders"
-        description={`${rows.length} riders · ${online} online. Riders deliver orders for shops using Dukaan Express riders; you approve their wallet withdrawals.`}
+        description={`${rows.length} riders · ${online} online. New riders who sign up in your area need your approval (check their documents below). You also approve their wallet withdrawals.`}
         actions={<AddRiderButton endpoint="/dealer/riders" />}
       />
+      <PendingRiderReviews where={{ dealerId: user.dealerId! }} />
       <RidersTable rows={rows} base="/dealer/riders" />
     </div>
   );

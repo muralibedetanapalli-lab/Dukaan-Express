@@ -11,6 +11,7 @@ export async function riderRows(where: Prisma.RiderWhereInput): Promise<RiderRow
     include: {
       user: { select: { name: true, email: true, phone: true, status: true, lastLoginAt: true } },
       dealer: { select: { user: { select: { name: true } } } },
+      serviceArea: { select: { city: true } },
       deliveries: { where: { status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } }, select: { id: true } },
       _count: { select: { deliveries: { where: { status: "DELIVERED" } } } },
     },
@@ -26,6 +27,8 @@ export async function riderRows(where: Prisma.RiderWhereInput): Promise<RiderRow
     vehicle: [r.vehicleType, r.vehicleNumber].filter(Boolean).join(" · ") || null,
     dealer: r.dealer?.user.name ?? null,
     status: r.user.status,
+    kyc: r.kycStatus,
+    area: r.serviceArea?.city ?? null,
     online: r.isOnline,
     busy: r.deliveries.length > 0,
     deliveries: r._count.deliveries,

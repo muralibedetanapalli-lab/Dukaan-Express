@@ -17,7 +17,7 @@ const NAV = [
   { href: "/dealer/earnings", label: "My earnings", short: "Earnings", icon: IndianRupee },
 ];
 
-export function DealerChrome({ name, regions, pending, children }: { name: string; regions: string[]; pending: number; children: React.ReactNode }) {
+export function DealerChrome({ name, regions, pending, ridersToVerify = 0, children }: { name: string; regions: string[]; pending: number; ridersToVerify?: number; children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
 
@@ -29,7 +29,7 @@ export function DealerChrome({ name, regions, pending, children }: { name: strin
 
   const isActive = (href: string) => (href === "/dealer" ? path === "/dealer" : path.startsWith(href));
   const badge = (href: string) =>
-    href === "/dealer/payouts" && pending > 0 ? <span className="grid min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-bold text-white">{pending}</span> : null;
+    (href === "/dealer/payouts" && pending > 0) || (href === "/dealer/riders" && ridersToVerify > 0) ? <span className="grid min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-bold text-white">{href === "/dealer/riders" ? ridersToVerify : pending}</span> : null;
 
   return (
     <div className="min-h-dvh bg-muted/30">

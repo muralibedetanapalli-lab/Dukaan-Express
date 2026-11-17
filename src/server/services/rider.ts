@@ -69,7 +69,8 @@ export async function createRider(actor: SessionUser, input: z.infer<typeof zRid
       email: input.email,
       phone: input.phone,
       passwordHash: await hashPassword(password),
-      rider: { create: { dealerId, vehicleType: input.vehicleType, vehicleNumber: input.vehicleNumber || null } },
+      // Added by their dealer or an admin: verified by that person, so no document review is needed.
+      rider: { create: { dealerId, vehicleType: input.vehicleType, vehicleNumber: input.vehicleNumber || null, kycStatus: "APPROVED", kycReviewedAt: new Date(), kycReviewedById: actor.id } },
     },
     include: { rider: true },
   });
@@ -123,6 +124,10 @@ export async function resetRiderPassword(actor: SessionUser, riderId: string) {
 /** Rider goes online (gets job alerts) or offline. */
 export async function setOnline(user: SessionUser, online: boolean) {
   const riderId = requireRider(user);
+  if (online) {
+    const r = await db.rider.findUniqueOrThrow({ where: { id: riderId }, select: { kycStatus: true } });
+    if (r.kycStatus !== "APPROVED") throw badRequest("Your documents must be approved before you can go online");
+  }
   if (!online && (await db.shipment.findFirst({ where: { riderId, status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } } }))) {
     throw conflict("Finish your current delivery before going offline");
   }

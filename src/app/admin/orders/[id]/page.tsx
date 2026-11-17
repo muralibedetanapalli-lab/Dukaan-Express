@@ -33,7 +33,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   const freeRiders =
     order.status === "SHIPMENT_CREATED"
       ? await db.rider.findMany({
-          where: { isOnline: true, user: { status: "ACTIVE" }, deliveries: { none: { status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } } } },
+          where: { isOnline: true, kycStatus: "APPROVED", user: { status: "ACTIVE" }, deliveries: { none: { status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } } } },
           include: { user: { select: { name: true, phone: true } } },
           take: 50,
         })

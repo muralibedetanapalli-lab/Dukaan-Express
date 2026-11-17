@@ -8,13 +8,15 @@ export const dynamic = "force-dynamic";
 export default async function DealerLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user || user.role !== "DEALER" || !user.dealerId) redirect("/login/staff?next=/dealer");
-  const [regions, pendingShops, pendingRiders] = await Promise.all([
+  const [regions, pendingShops, pendingRiders, ridersToVerify] = await Promise.all([
     db.serviceArea.findMany({ where: { dealerId: user.dealerId }, orderBy: { city: "asc" }, select: { city: true } }),
     db.shopSettlement.count({ where: { status: "DEALER_REVIEW", shop: { dealerId: user.dealerId } } }),
     db.riderWithdrawal.count({ where: { status: "DEALER_REVIEW", rider: { dealerId: user.dealerId } } }),
+    db.rider.count({ where: { kycStatus: "PENDING", dealerId: user.dealerId } }),
   ]);
   return (
-    <DealerChrome name={user.name ?? "Dealer"} regions={regions.map((r) => r.city)} pending={pendingShops + pendingRiders}>
+    <DealerChrome name={user.name ?? "Dealer"} regions={regions.map((r) => r.city)} pending={pendingShops + pendingRiders}
+      ridersToVerify={ridersToVerify}>
       {children}
     </DealerChrome>
   );

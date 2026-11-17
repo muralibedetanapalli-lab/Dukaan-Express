@@ -87,7 +87,7 @@ export async function makeRider(opts: { phone?: string; dealerId?: string | null
       email: `rider-${Math.random().toString(36).slice(2, 8)}@t.in`,
       phone: opts.phone ?? `98${Math.floor(10_000_000 + Math.random() * 89_999_999)}`,
       passwordHash: "x",
-      rider: { create: { isOnline: true, lat: 12.935, lng: 77.6245, locationAt: new Date(), dealerId: opts.dealerId ?? null } },
+      rider: { create: { isOnline: true, kycStatus: "APPROVED", lat: 12.935, lng: 77.6245, locationAt: new Date(), dealerId: opts.dealerId ?? null } },
     },
     include: { rider: true },
   });

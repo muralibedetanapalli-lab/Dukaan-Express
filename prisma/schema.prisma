@@ -91,6 +91,14 @@ enum DeliveryMode {
   RIDER // a Dukaan Express rider picks up and delivers; the rider earns the delivery fee
 }
 
+/// Rider verification: self-signed-up riders upload documents; their dealer or an admin approves.
+enum RiderKycStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum WalletEntryType {
   DELIVERY_EARNING // + delivery fee for a completed delivery
   COD_COLLECTED // − cash the rider collected from a cash-on-delivery customer (rider keeps it)
@@ -921,6 +929,7 @@ model ServiceArea {
   /// One dealer per region; a dealer can cover several regions.
   dealerId String?
   dealer   Dealer? @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  riders   Rider[]
 
   @@unique([city, state])
   @@index([dealerId])
@@ -1034,19 +1043,35 @@ model DealerBankAccount {
 
 /// Delivery rider, onboarded by a regional dealer. Works in the Dukaan Rider app.
 model Rider {
-  id            String    @id @default(cuid())
-  userId        String    @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dealerId      String?
-  dealer        Dealer?   @relation(fields: [dealerId], references: [id], onDelete: SetNull)
-  vehicleType   String? // BIKE | SCOOTER | CYCLE | OTHER
-  vehicleNumber String?
-  isOnline      Boolean   @default(false)
-  lat           Float?
-  lng           Float?
-  locationAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String         @id @default(cuid())
+  userId           String         @unique
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealerId         String?
+  dealer           Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  vehicleType      String? // BIKE | SCOOTER | CYCLE | OTHER
+  vehicleNumber    String?
+  /// Area the rider works in (chosen at signup); its dealer reviews the rider.
+  serviceAreaId    String?
+  serviceArea      ServiceArea?   @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
+  kycStatus        RiderKycStatus @default(NOT_SUBMITTED)
+  aadhaarNumberEnc String? // AES-256-GCM; only the last 4 digits are ever shown
+  aadhaarLast4     String?
+  licenseNumber    String?
+  /// Private document references (Cloudinary authenticated assets or local dev files) — never public URLs.
+  aadhaarFrontRef  String?
+  aadhaarBackRef   String?
+  licenseRef       String?
+  rcRef            String?
+  kycSubmittedAt   DateTime?
+  kycReviewedAt    DateTime?
+  kycReviewedById  String?
+  kycNote          String? // rejection reason shown to the rider
+  isOnline         Boolean        @default(false)
+  lat              Float?
+  lng              Float?
+  locationAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   deliveries  Shipment[]
   wallet      RiderWalletEntry[]
@@ -1055,6 +1080,7 @@ model Rider {
 
   @@index([isOnline])
   @@index([dealerId])
+  @@index([kycStatus])
 }
 
 /// Rider wallet ledger. Balance = sum(amount). Each delivery adds its fee once (unique per order and type).

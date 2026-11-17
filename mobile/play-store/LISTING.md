@@ -254,6 +254,8 @@ Encrypted in transit: **Yes**. Deletion: **Yes** (by request — `BASE/legal/del
 | Precise location | Yes | Yes (with the customer while delivering their order) | Required | App functionality |
 | Approximate location | Yes | No | Required | App functionality |
 | Other financial info (bank account / UPI for withdrawals) | Yes | No | Required | App functionality |
+| Other info → ID documents (Aadhaar number, photos of Aadhaar, driving licence, RC) | Yes | No (seen only by the rider's dealer and the platform team) | Required | Account management (identity verification) |
+| Photos (document photos taken with the camera) | Yes | No | Required | Account management |
 | Device or other IDs (push token) | Yes | No | Optional | App functionality |
 
 For the rider app's content-rating questionnaire, answer **Yes** to "shares user location with other users" (customers see the rider during a delivery).
@@ -263,7 +265,7 @@ For the rider app's content-rating questionnaire, answer **Yes** to "shares user
 - **Partner:** `CAMERA` to photograph products.
 - **Rider:** `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` while online in the app (foreground only — the app keeps the screen on during a delivery; there is **no** background location, so no background-location declaration or video is needed).
 - **All:** notifications (Android 13+ asks at runtime).
-- **Rider reviewer login:** create a demo rider in Admin → Riders and give Google its email and password. Instructions: *"Switch Online to see deliveries; they appear when a shop packs an order."*
+- **Rider reviewer login:** create a demo rider in Admin → Riders (riders added there are pre-approved) and give Google its email and password. Instructions: *"Switch Online to see deliveries; they appear when a shop packs an order."*
 
 ---
 

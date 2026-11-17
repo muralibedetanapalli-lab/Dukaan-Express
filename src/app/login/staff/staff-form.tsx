@@ -63,6 +63,12 @@ export function StaffLoginForm() {
       <Button type="submit" size="lg" disabled={busy}>
         {busy && <Loader2 className="animate-spin" />} Sign in
       </Button>
+      <p className="text-center text-sm text-muted-foreground">
+        Want to deliver with us?{" "}
+        <Link href="/rider-signup" className="font-semibold text-primary hover:underline">
+          Become a rider
+        </Link>
+      </p>
     </form>
   );
 }

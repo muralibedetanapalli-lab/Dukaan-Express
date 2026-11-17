@@ -25,6 +25,11 @@ export default async function PrivacyPage() {
           <li><b>Payment data:</b> processed by Cashfree Payments. We receive the payment status, method type and a transaction reference, never your full card number, CVV or UPI PIN.</li>
           <li><b>Device data:</b> a push-notification token (if you allow notifications), browser or app version, IP address and basic logs needed for security.</li>
           <li><b>For shop owners:</b> business details, GST number, payout bank account (the account number is stored encrypted) and records of payouts.</li>
+          <li>
+            <b>For riders:</b> the area you work in; identity and eligibility documents — Aadhaar number (stored encrypted and shown only as the last 4 digits) and photos of your Aadhaar card,
+            driving licence and vehicle RC; your vehicle details; your location while you are online in the Dukaan Rider app; your earnings, cash collected and withdrawal bank account.
+            Document photos are stored privately and are seen only by your dealer and our team, to verify you before you can deliver.
+          </li>
         </List>
         <p>We do not knowingly collect data from children under 18 without a parent&apos;s or guardian&apos;s consent.</p>
       </Section>

@@ -13,6 +13,8 @@ export interface RiderRow {
   vehicle: string | null;
   dealer?: string | null;
   status: string;
+  kyc: string;
+  area?: string | null;
   online: boolean;
   busy: boolean;
   deliveries: number;
@@ -52,12 +54,18 @@ export function RidersTable({ rows, base, showDealer }: { rows: RiderRow[]; base
                 <p className="text-xs text-muted-foreground">
                   {r.phone} · {r.email}
                 </p>
-                {r.vehicle && <p className="text-xs text-muted-foreground">{r.vehicle}</p>}
+                {(r.vehicle || r.area) && <p className="text-xs text-muted-foreground">{[r.vehicle, r.area].filter(Boolean).join(" · ")}</p>}
               </TableCell>
               {showDealer && <TableCell className="text-sm">{r.dealer ?? <span className="text-muted-foreground">—</span>}</TableCell>}
               <TableCell>
                 {r.status !== "ACTIVE" ? (
                   <Pill>Inactive</Pill>
+                ) : r.kyc === "PENDING" ? (
+                  <Pill tone="warning">Awaiting approval</Pill>
+                ) : r.kyc === "NOT_SUBMITTED" ? (
+                  <Pill>Documents not uploaded</Pill>
+                ) : r.kyc === "REJECTED" ? (
+                  <Pill tone="danger">Documents rejected</Pill>
                 ) : r.busy ? (
                   <Pill tone="primary">On a delivery</Pill>
                 ) : r.online ? (

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DevCodeNotice, PasswordHint, PasswordInput, passwordOk, safeNext } from "@/components/shared/auth-fields";
 import { api, errorMessage } from "@/lib/api-client";
 
@@ -17,10 +18,14 @@ const PHONE_RE = /^[6-9]\d{9}$/;
 /**
  * Customer signup: name, mobile (required, not verified), email (verified with a 6-digit code), password.
  * "Create account" stays disabled until the email is verified and every field is valid.
+ * With `riderAreas` it is the Dukaan Rider signup: the rider also picks the area they will work in.
  */
-export function SignupForm() {
+export function SignupForm({ riderAreas }: { riderAreas?: { id: string; city: string; state: string; shops: number }[] } = {}) {
   const router = useRouter();
-  const next = safeNext(useSearchParams().get("next"));
+  const rider = !!riderAreas;
+  const [areaId, setAreaId] = useState("");
+  const nextParam = useSearchParams().get("next");
+  const next = rider ? "/rider" : safeNext(nextParam);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -43,7 +48,7 @@ export function SignupForm() {
   const emailValid = EMAIL_RE.test(email.trim());
   const phoneValid = PHONE_RE.test(phone);
   const mismatch = confirm.length > 0 && confirm !== password;
-  const canCreate = verified && name.trim().length >= 2 && phoneValid && passwordOk(password) && password === confirm && !busy;
+  const canCreate = verified && name.trim().length >= 2 && phoneValid && passwordOk(password) && password === confirm && (!rider || !!areaId) && !busy;
 
   async function sendCode() {
     setBusy("send");
@@ -87,8 +92,13 @@ export function SignupForm() {
     if (!canCreate || !token) return;
     setBusy("create");
     try {
-      await api("/auth/signup", { body: { name: name.trim(), phone, email: email.trim(), password, verificationToken: token } });
-      toast.success("Welcome to Dukaan Express!");
+      if (rider) {
+        await api("/rider-signup", { body: { name: name.trim(), phone, email: email.trim(), password, areaId, verificationToken: token } });
+        toast.success("Account created! Now upload your documents.");
+      } else {
+        await api("/auth/signup", { body: { name: name.trim(), phone, email: email.trim(), password, verificationToken: token } });
+        toast.success("Welcome to Dukaan Express!");
+      }
       router.replace(next);
       router.refresh();
     } catch (err) {
@@ -122,6 +132,31 @@ export function SignupForm() {
         </div>
         {phone.length === 10 && !phoneValid && <p className="text-xs text-destructive">Enter a valid 10-digit Indian mobile number</p>}
       </div>
+
+      {rider && (
+        <div className="grid gap-2">
+          <Label htmlFor="area">Area you want to deliver in</Label>
+          {riderAreas!.length === 0 ? (
+            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              We don&apos;t have shops live in any area yet. Please check back soon.
+            </p>
+          ) : (
+            <Select value={areaId} onValueChange={setAreaId}>
+              <SelectTrigger id="area" className="h-11 w-full">
+                <SelectValue placeholder="Choose your area" />
+              </SelectTrigger>
+              <SelectContent>
+                {riderAreas!.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.city}, {a.state} · {a.shops} shop{a.shops === 1 ? "" : "s"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <p className="text-xs text-muted-foreground">You&apos;ll get delivery requests from shops in this area.</p>
+        </div>
+      )}
 
       <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
@@ -212,7 +247,7 @@ export function SignupForm() {
       </p>
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href={next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`} className="font-semibold text-primary hover:underline">
+        <Link href={rider ? "/login/staff?next=/rider" : next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`} className="font-semibold text-primary hover:underline">
           Log in
         </Link>
       </p>

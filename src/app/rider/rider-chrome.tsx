@@ -27,12 +27,15 @@ export function RiderChrome({
   vehicle,
   online: initialOnline,
   busy,
+  approved = true,
   children,
 }: {
   name: string;
   vehicle: string | null;
   online: boolean;
   busy: boolean;
+  /** Not yet verified: no online switch, no tabs — just the documents screen. */
+  approved?: boolean;
   children: React.ReactNode;
 }) {
   const path = usePathname();
@@ -43,7 +46,7 @@ export function RiderChrome({
 
   // Share location while online.
   useEffect(() => {
-    if (!online || !("geolocation" in navigator)) return;
+    if (!approved || !online || !("geolocation" in navigator)) return;
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setGeoError(null);
@@ -55,7 +58,7 @@ export function RiderChrome({
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [online]);
+  }, [online, approved]);
 
   // Keep the screen on during a delivery (location sharing stops when the phone sleeps).
   useEffect(() => {
@@ -122,10 +125,14 @@ export function RiderChrome({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {approved ? (
           <label className="ml-auto flex items-center gap-2 text-xs font-semibold">
             <span className={online ? "text-primary" : "text-muted-foreground"}>{online ? "Online" : "Offline"}</span>
             <Switch checked={online} onCheckedChange={toggle} aria-label="Online for deliveries" />
           </label>
+          ) : (
+            <span className="ml-auto text-xs font-semibold text-muted-foreground">Verification</span>
+          )}
         </div>
         {online && geoError && (
           <p className="flex items-center justify-center gap-1.5 bg-amber-100 px-4 py-1.5 text-center text-xs font-medium text-amber-900">
@@ -134,7 +141,7 @@ export function RiderChrome({
         )}
       </header>
       <main className="mx-auto max-w-xl px-4 pt-4 pb-24">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)]">
+      {approved && <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-2">
           {NAV.map((n) => (
             <li key={n.href}>
@@ -145,7 +152,7 @@ export function RiderChrome({
             </li>
           ))}
         </ul>
-      </nav>
+      </nav>}
     </div>
   );
 }

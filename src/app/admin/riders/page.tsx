@@ -3,6 +3,7 @@ import { riderRows } from "@/server/services/rider-list";
 import { PageHeader } from "@/components/shared/misc";
 import { AddRiderButton } from "@/components/shared/rider-dialog";
 import { RidersTable } from "@/components/shared/riders-table";
+import { PendingRiderReviews } from "@/components/shared/rider-kyc-review";
 
 export const metadata = { title: "Riders" };
 
@@ -19,6 +20,7 @@ export default async function AdminRidersPage() {
         description={`${rows.length} riders · ${online} online. Dealers usually add their own riders; withdrawals go to the rider's dealer first, then to you in Commission & payouts.`}
         actions={<AddRiderButton endpoint="/admin/riders" dealers={dealers.map((d) => ({ id: d.id, name: d.user.name ?? "Dealer" }))} />}
       />
+      <PendingRiderReviews where={{}} />
       <RidersTable rows={rows} base="/admin/riders" showDealer />
     </div>
   );
