@@ -51,8 +51,10 @@ export const settingsSchema = z.object({
       maxRadiusKm: z.number().min(0.5).max(50).default(10),
       avgSpeedKmph: z.number().min(5).max(80).default(20),
       handoverBufferMinutes: z.number().int().min(0).default(5),
-      courierStrategy: z.enum(["FASTEST", "CHEAPEST", "RECOMMENDED"]).default("FASTEST"),
-      autoSchedulePickup: z.boolean().default(true),
+      /** Riders are offered jobs whose pickup is within this distance of them. */
+      riderSearchRadiusKm: z.number().min(0.5).max(30).default(5),
+      /** After this long without a rider, the shop and admins are alerted (shop can deliver it themselves). */
+      riderSearchTimeoutMinutes: z.number().int().min(1).max(120).default(10),
     })
     .prefault({}),
   tax: z

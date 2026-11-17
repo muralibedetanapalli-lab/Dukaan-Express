@@ -6,17 +6,29 @@ import { ConfirmButton } from "@/components/shared/confirm-button";
 import { api } from "@/lib/api-client";
 
 /** Approve (→ platform admin) or decline a shop's payout request. */
-export function PayoutReviewActions({ id, label }: { id: string; label: string }) {
+export function PayoutReviewActions({
+  id,
+  label,
+  endpoint = `/dealer/payouts/${id}/review`,
+  approveHelp = "It goes to the platform admin, who transfers the money to the shop's bank account. Approve only after checking the orders and bank details.",
+  declineHelp = "The orders go back to the shop's available balance and the owner sees your reason.",
+}: {
+  id: string;
+  label: string;
+  endpoint?: string;
+  approveHelp?: string;
+  declineHelp?: string;
+}) {
   const router = useRouter();
   return (
     <div className="flex flex-wrap gap-2">
       <ConfirmButton
         title={`Approve ${label}?`}
-        description="It goes to the platform admin, who transfers the money to the shop's bank account. Approve only after checking the orders and bank details."
+        description={approveHelp}
         confirmLabel="Approve & send to admin"
         successMessage="Approved — sent to the platform admin"
         onConfirm={async () => {
-          await api(`/dealer/payouts/${id}/review`, { body: { approve: true } });
+          await api(endpoint, { body: { approve: true } });
           router.refresh();
         }}
         size="sm"
@@ -25,14 +37,14 @@ export function PayoutReviewActions({ id, label }: { id: string; label: string }
       </ConfirmButton>
       <ConfirmButton
         title={`Decline ${label}?`}
-        description="The orders go back to the shop's available balance and the owner sees your reason."
+        description={declineHelp}
         confirmLabel="Decline request"
         destructive
         requireReason
-        reasonLabel="Reason shown to the shop owner"
+        reasonLabel="Reason (they will see it)"
         successMessage="Payout request declined"
         onConfirm={async (reason) => {
-          await api(`/dealer/payouts/${id}/review`, { body: { approve: false, reason } });
+          await api(endpoint, { body: { approve: false, reason } });
           router.refresh();
         }}
         variant="outline"

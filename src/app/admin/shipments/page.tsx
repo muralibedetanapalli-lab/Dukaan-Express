@@ -1,57 +1,63 @@
 import Link from "next/link";
+import { Bike, Clock, Store, Truck } from "lucide-react";
 import { db } from "@/server/db";
-import { integrationModes } from "@/server/env";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader, SandboxBadge } from "@/components/shared/misc";
+import { PageHeader, StatCard } from "@/components/shared/misc";
 import { OrderStatusBadge, ShipmentStatusBadge } from "@/components/shared/status-badge";
 import { Pagination } from "@/components/shared/pagination";
 import { FilterBar } from "@/components/admin/filter-bar";
 import { RealtimeListener } from "@/components/shared/realtime";
-import { SHIPMENT_STATUS_LABEL } from "@/lib/order-status";
+import { DELIVERY_MODE_LABEL, SHIPMENT_STATUS_LABEL } from "@/lib/order-status";
 import { formatINR } from "@/lib/money";
 import { fmtAgo } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata = { title: "Deliveries" };
 
-export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function DeliveriesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const pageSize = 25;
   const where: Prisma.ShipmentWhereInput = {
     ...(sp.status ? { status: sp.status as Prisma.ShipmentWhereInput["status"] & string } : {}),
+    ...(sp.mode === "OWN" || sp.mode === "RIDER" ? { mode: sp.mode } : {}),
     ...(sp.failed === "true" ? { failedDeliveryCount: { gt: 0 } } : {}),
-    ...(sp.q ? { OR: [{ awbCode: { contains: sp.q } }, { order: { orderNumber: { contains: sp.q.toUpperCase() } } }, { shiprocketShipmentId: { contains: sp.q } }] } : {}),
+    ...(sp.q ? { order: { orderNumber: { contains: sp.q.toUpperCase() } } } : {}),
   };
-  const [items, total, exceptions, failed] = await Promise.all([
+  const [items, total, waiting, active, online, failed] = await Promise.all([
     db.shipment.findMany({
       where,
       orderBy: { updatedAt: "desc" },
-      include: { order: { select: { id: true, orderNumber: true, status: true, shop: { select: { name: true } } } } },
+      include: {
+        order: { select: { id: true, orderNumber: true, status: true, shop: { select: { name: true } } } },
+        rider: { select: { user: { select: { name: true, phone: true } } } },
+      },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     db.shipment.count({ where }),
-    db.shipment.count({ where: { status: "EXCEPTION" } }),
+    db.shipment.count({ where: { status: "CREATED", riderId: null } }),
+    db.shipment.count({ where: { status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } } }),
+    db.rider.count({ where: { isOnline: true, user: { status: "ACTIVE" } } }),
     db.shipment.count({ where: { failedDeliveryCount: { gt: 0 } } }),
   ]);
   return (
     <div>
       <RealtimeListener />
-      <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            Deliveries {integrationModes().shiprocket === "mock" && <SandboxBadge label="Shiprocket sandbox" />}
-          </span>
-        }
-        description={`${exceptions} exception(s) need attention · ${failed} shipment(s) with failed delivery attempts`}
-      />
+      <PageHeader title="Deliveries" description="Rider and own-staff deliveries. Open an order to assign a rider or complete a delivery." />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Waiting for a rider" value={waiting} icon={Clock} tone={waiting ? "warning" : "default"} href="/admin/shipments?status=CREATED" />
+        <StatCard label="On the road" value={active} icon={Truck} tone="primary" />
+        <StatCard label="Riders online" value={online} icon={Bike} tone="success" href="/admin/riders" />
+        <StatCard label="With failed attempts" value={failed} icon={Store} tone={failed ? "danger" : "default"} href="/admin/shipments?failed=true" />
+      </div>
       <FilterBar
         basePath="/admin/shipments"
         filters={[
-          { key: "q", label: "AWB, shipment ID or order #", type: "search" },
+          { key: "q", label: "Order #", type: "search" },
           { key: "status", label: "Statuses", type: "select", options: Object.entries(SHIPMENT_STATUS_LABEL).map(([value, label]) => ({ value, label })) },
+          { key: "mode", label: "Delivered by", type: "select", options: Object.entries(DELIVERY_MODE_LABEL).map(([value, label]) => ({ value, label })) },
           { key: "failed", label: "Failed attempts", type: "select", options: [{ value: "true", label: "With failed attempts" }] },
         ]}
       />
@@ -61,15 +67,22 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             <TableRow>
               <TableHead>Order</TableHead>
               <TableHead>Shop</TableHead>
-              <TableHead>Shiprocket IDs</TableHead>
-              <TableHead>AWB / courier</TableHead>
-              <TableHead>Shipment</TableHead>
+              <TableHead>Delivered by</TableHead>
+              <TableHead>Delivery</TableHead>
               <TableHead>Order status</TableHead>
-              <TableHead className="text-right">Freight</TableHead>
+              <TableHead className="text-right">Rider fee</TableHead>
+              <TableHead className="text-right">Cash to collect</TableHead>
               <TableHead>Updated</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
+            {items.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  No deliveries
+                </TableCell>
+              </TableRow>
+            )}
             {items.map((s) => (
               <TableRow key={s.id}>
                 <TableCell>
@@ -77,34 +90,27 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                     {s.order.orderNumber}
                   </Link>
                 </TableCell>
-                <TableCell>{s.order.shop.name}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {s.shiprocketShipmentId ?? "—"}
-                  <br />
-                  <span className="text-muted-foreground">{s.shiprocketOrderId}</span>
-                </TableCell>
-                <TableCell className="text-xs">
-                  <span className="font-mono">{s.awbCode ?? "—"}</span>
-                  <br />
-                  {s.courierName}
-                  {s.riderName && <span className="block text-muted-foreground">Rider: {s.riderName}</span>}
+                <TableCell className="text-sm">{s.order.shop.name}</TableCell>
+                <TableCell className="text-sm">
+                  {s.mode === "OWN" ? "Shop staff" : s.rider ? s.rider.user.name : s.status === "CREATED" ? <span className="text-amber-700">No rider yet</span> : <span className="text-muted-foreground">—</span>}
+                  {s.rider?.user.phone && <p className="text-xs text-muted-foreground">{s.rider.user.phone}</p>}
                 </TableCell>
                 <TableCell>
                   <ShipmentStatusBadge status={s.status} />
-                  {s.failedDeliveryCount > 0 && <p className="mt-1 text-xs text-destructive">{s.failedDeliveryCount} failed attempt(s)</p>}
-                  {s.status === "EXCEPTION" && <p className="mt-1 max-w-56 text-xs text-destructive">{s.lastError}</p>}
+                  {s.lastError && <p className="mt-0.5 max-w-48 truncate text-xs text-red-600">{s.lastError}</p>}
                 </TableCell>
                 <TableCell>
                   <OrderStatusBadge status={s.order.status} />
                 </TableCell>
-                <TableCell className="text-right">{s.freightCharge != null ? formatINR(s.freightCharge) : "—"}</TableCell>
-                <TableCell className="text-xs">{fmtAgo(s.updatedAt)}</TableCell>
+                <TableCell className="text-right tabular-nums">{s.mode === "RIDER" ? formatINR(s.riderFee) : "—"}</TableCell>
+                <TableCell className="text-right tabular-nums">{s.codAmount ? formatINR(s.codAmount) : "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{fmtAgo(s.updatedAt)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
-      <Pagination page={page} pageSize={pageSize} total={total} basePath="/admin/shipments" params={{ q: sp.q, status: sp.status, failed: sp.failed }} />
+      <Pagination page={page} pageSize={pageSize} total={total} basePath="/admin/shipments" params={sp} />
     </div>
   );
 }

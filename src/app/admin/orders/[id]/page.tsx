@@ -4,12 +4,12 @@ import { getSessionUser } from "@/server/auth/session";
 import { AppError } from "@/server/errors";
 import { getOrderForActor } from "@/server/services/order";
 import { nextStatuses } from "@/server/services/order-state";
-import { integrationModes } from "@/server/env";
+import { db } from "@/server/db";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { KeyValue, PageHeader, ProductThumb } from "@/components/shared/misc";
 import { OrderStatusBadge, PaymentBadge, Pill } from "@/components/shared/status-badge";
-import { ShipmentPanel } from "@/components/shared/shipment-panel";
+import { DeliveryPanel } from "@/components/shared/delivery-panel";
 import { RealtimeListener } from "@/components/shared/realtime";
 import { ActionButton } from "@/components/admin/action-button";
 import { formatINR, bpsToPercent } from "@/lib/money";
@@ -29,6 +29,15 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
     if (e instanceof AppError && e.status === 404) notFound();
     throw e;
   }
+  // Free riders online, for manual assignment while the order waits for a rider.
+  const freeRiders =
+    order.status === "SHIPMENT_CREATED"
+      ? await db.rider.findMany({
+          where: { isOnline: true, user: { status: "ACTIVE" }, deliveries: { none: { status: { in: ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] } } } },
+          include: { user: { select: { name: true, phone: true } } },
+          take: 50,
+        })
+      : [];
   const addr = order.addressSnapshot as Record<string, string | null>;
   const captured = order.payments.find((p) => p.status === "CAPTURED" || p.status === "PARTIALLY_REFUNDED");
   const refunded = order.refunds.filter((r) => r.status !== "FAILED").reduce((s, r) => s + r.amount, 0);
@@ -121,7 +130,14 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             </Table>
           </Card>
 
-          <ShipmentPanel orderId={order.id} role="admin" orderStatus={order.status} shipment={order.shipment} sandbox={integrationModes().shiprocket === "mock"} />
+          <DeliveryPanel
+            orderId={order.id}
+            role="admin"
+            orderStatus={order.status}
+            shopMode={order.shop.deliveryMode}
+            delivery={order.shipment}
+            riders={freeRiders.map((r) => ({ id: r.id, name: r.user.name ?? "Rider", detail: [r.user.phone, r.vehicleNumber].filter(Boolean).join(" · ") }))}
+          />
 
           <Card className="gap-0 p-0">
             <p className="border-b px-4 py-3 font-semibold">Status history</p>

@@ -142,6 +142,54 @@ First release of Dukaan Partner: receive orders with loud alerts, manage your st
 
 ---
 
+## App 3 — Dukaan Rider (delivery riders)
+
+- **Package:** `in.dukaanexpress.rider`
+- **Upload:** `../dist/dukaan-rider-1.0.0.aab`
+- **Category:** Business (or Maps & Navigation)
+- **Tags:** Delivery, Business
+- **Free / paid:** Free. **Contains ads:** No. **In-app purchases:** No.
+- **Graphics:** `rider/icon-512.png`, `rider/feature-graphic.png`, `rider/screenshots/01…03-*.png`
+
+**App name**
+```
+Dukaan Rider
+```
+
+**Short description** (80 max)
+```
+For Dukaan Express riders: accept deliveries, navigate, earn and withdraw.
+```
+
+**Full description**
+```
+Dukaan Rider is the app for delivery riders working with Dukaan Express. Pick up orders from local shops near you and deliver them to customers — and earn on every delivery.
+
+GET DELIVERIES NEAR YOU
+• Go online and get an alert the moment a shop near you packs an order
+• See the pickup distance, the delivery distance and what you'll earn before you accept
+• Prepaid or cash-on-delivery is shown up front
+
+DELIVER WITH CONFIDENCE
+• Shop and customer addresses with one-tap navigation and calling
+• Confirm every handover with the customer's 4-digit delivery code
+• Customers see your live location while you deliver their order, so fewer calls asking "where are you?"
+
+EARN AND WITHDRAW
+• Every delivery fee goes straight to your wallet
+• Track earnings and cash collected in one place
+• Withdraw to your bank account whenever you want — your dealer approves it and the money is sent with a bank reference number
+
+Dukaan Rider is for riders registered with a Dukaan Express dealer. To start riding, contact your local Dukaan Express dealer.
+```
+
+**Release notes**
+```
+First release of Dukaan Rider: accept nearby deliveries, share live location with customers, and withdraw your earnings.
+```
+
+---
+
 ## App content (Policy → App content) — answers for both apps
 
 | Section | Answer |
@@ -195,10 +243,27 @@ Encrypted in transit: **Yes**. Deletion: **Yes** (by request — `BASE/legal/del
 | Purchase history (orders received) | Yes | No | Required | App functionality, Analytics |
 | Device or other IDs (push token) | Yes | No | Optional | App functionality |
 
+### Data safety — Dukaan Rider
+Encrypted in transit: **Yes**. Deletion: **Yes** (by request — `BASE/legal/delete-account`).
+
+| Data type | Collected | Shared | Required? | Purposes |
+|---|---|---|---|---|
+| Name | Yes | Yes (shown to the customer and shop of each delivery) | Required | App functionality, Account management |
+| Email address | Yes | No | Required | Account management |
+| Phone number | Yes | Yes (customer and shop of each delivery) | Required | App functionality |
+| Precise location | Yes | Yes (with the customer while delivering their order) | Required | App functionality |
+| Approximate location | Yes | No | Required | App functionality |
+| Other financial info (bank account / UPI for withdrawals) | Yes | No | Required | App functionality |
+| Device or other IDs (push token) | Yes | No | Optional | App functionality |
+
+For the rider app's content-rating questionnaire, answer **Yes** to "shares user location with other users" (customers see the rider during a delivery).
+
 ### Permissions you may be asked about
 - **Customer:** `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`, used only while the app is open to find shops near you (no background location, so no extra declaration).
 - **Partner:** `CAMERA` to photograph products.
-- **Both:** notifications (Android 13+ asks at runtime).
+- **Rider:** `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` while online in the app (foreground only — the app keeps the screen on during a delivery; there is **no** background location, so no background-location declaration or video is needed).
+- **All:** notifications (Android 13+ asks at runtime).
+- **Rider reviewer login:** create a demo rider in Admin → Riders and give Google its email and password. Instructions: *"Switch Online to see deliveries; they appear when a shop packs an order."*
 
 ---
 

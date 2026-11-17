@@ -43,6 +43,19 @@ const APPS = [
       ["shop-6-settings", "Your shop, your hours", "Set opening hours and preparation time"],
     ],
   },
+  {
+    dir: "rider",
+    name: "Dukaan Rider",
+    tagline: "Deliver orders from local shops and earn on every delivery",
+    from: "#f59e0b",
+    to: "#78350f",
+    hero: "rider-1-jobs",
+    shots: [
+      ["rider-1-jobs", "Deliveries near you", "Get alerts and accept the ones you want"],
+      ["rider-2-active", "Pick up and deliver", "Shop and customer address, one-tap navigation"],
+      ["rider-3-code", "Safe handover", "Confirm every delivery with the customer's code"],
+    ],
+  },
 ];
 
 const grad = (id, from, to) => `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient>`;

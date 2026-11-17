@@ -12,11 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { KeyValue } from "@/components/shared/misc";
 import { api, errorMessage } from "@/lib/api-client";
+import { DeliveryModeCard } from "./delivery-mode";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 
-export function ShopSettingsClient({ shop }: { shop: { name: string; avgPrepMinutes: number; deliveryRadiusKm: number; address: string; hours: Hours[] } }) {
+export function ShopSettingsClient({
+  shop,
+}: {
+  shop: { name: string; avgPrepMinutes: number; deliveryRadiusKm: number; address: string; hours: Hours[]; deliveryMode: "OWN" | "RIDER" };
+}) {
   const router = useRouter();
   const [hours, setHours] = useState<Hours[]>(() => DAYS.map((_, d) => shop.hours.find((h) => h.dayOfWeek === d) ?? { dayOfWeek: d, openTime: "08:00", closeTime: "22:00", isClosed: false }));
   const [prep, setPrep] = useState(String(shop.avgPrepMinutes));
@@ -45,6 +50,7 @@ export function ShopSettingsClient({ shop }: { shop: { name: string; avgPrepMinu
         <KeyValue label="Pickup address">{shop.address}</KeyValue>
         <KeyValue label="Delivery radius">{shop.deliveryRadiusKm} km</KeyValue>
       </Card>
+      <DeliveryModeCard mode={shop.deliveryMode} />
       <Card className="gap-4 p-4">
         <p className="flex items-center gap-2 font-semibold">
           <Clock className="size-5 text-primary" /> Operating hours

@@ -30,6 +30,7 @@ export interface ShopFormValue {
   deliveryRadiusKm: string;
   commissionPercent: string; // blank → platform default
   avgPrepMinutes: string;
+  deliveryMode: "OWN" | "RIDER";
   address: { line1: string; line2: string; landmark: string; city: string; state: string; pincode: string; latitude: string; longitude: string };
   hours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
 }
@@ -47,6 +48,7 @@ export const blankShop: ShopFormValue = {
   deliveryRadiusKm: "5",
   commissionPercent: "",
   avgPrepMinutes: "10",
+  deliveryMode: "RIDER",
   address: { line1: "", line2: "", landmark: "", city: "", state: "", pincode: "", latitude: "", longitude: "" },
   hours: DAYS.map((_, d) => ({ dayOfWeek: d, openTime: "07:00", closeTime: "23:00", isClosed: false })),
 };
@@ -90,6 +92,7 @@ export function ShopForm({
         deliveryRadiusKm: Number(v.deliveryRadiusKm),
         commissionBps: v.commissionPercent === "" ? null : Math.round(Number(v.commissionPercent) * 100),
         avgPrepMinutes: Number(v.avgPrepMinutes) || 10,
+        deliveryMode: v.deliveryMode,
         address: { ...v.address, line2: v.address.line2 || null, landmark: v.address.landmark || null, latitude: Number(v.address.latitude), longitude: Number(v.address.longitude) },
         hours: v.hours,
       };
@@ -248,7 +251,7 @@ export function ShopForm({
             <Input value={v.address.longitude} onChange={(e) => setA("longitude", e.target.value)} required inputMode="decimal" />
           </F>
         </div>
-        <p className="text-xs text-muted-foreground">The address is registered as the Shiprocket pickup location the first time a shipment is created.</p>
+        <p className="text-xs text-muted-foreground">Riders come to this address to pick up orders, so place the pin at the shop entrance.</p>
       </Card>
 
       <Card className="gap-4 p-5">
@@ -262,6 +265,17 @@ export function ShopForm({
               <Input value={v.commissionPercent} onChange={(e) => set("commissionPercent", e.target.value)} inputMode="decimal" placeholder={String(defaultCommission)} />
             </F>
           )}
+          <F label="Delivery by">
+            <Select value={v.deliveryMode} onValueChange={(x) => set("deliveryMode", x as "OWN" | "RIDER")}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="RIDER">Dukaan Express rider</SelectItem>
+                <SelectItem value="OWN">Shop&apos;s own staff</SelectItem>
+              </SelectContent>
+            </Select>
+          </F>
           <F label="Avg. prep time (min)">
             <Input value={v.avgPrepMinutes} onChange={(e) => set("avgPrepMinutes", e.target.value)} inputMode="numeric" />
           </F>

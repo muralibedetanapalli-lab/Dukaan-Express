@@ -6,9 +6,10 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 for (const k of [
   "CASHFREE_APP_ID",
   "CASHFREE_ENV",
-  "SHIPROCKET_EMAIL",
-  "SHIPROCKET_PASSWORD",
-  "SHIPROCKET_WEBHOOK_TOKEN",
+  // Email stays in mock mode so tests never send real mail (codes are returned to the caller instead).
+  "SMTP_HOST",
+  "SMTP_USER",
+  "SMTP_PASS",
   "GOOGLE_MAPS_API_KEY",
   "FCM_PROJECT_ID",
   "SMS_PROVIDER",

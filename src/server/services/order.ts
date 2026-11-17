@@ -347,6 +347,10 @@ export async function transitionOrder(orderId: string, to: OrderStatusKey, actor
       }
       // The shop's regional dealer (if any) earns a share of the platform commission, fixed at delivery.
       const dealer = (await tx.shop.findUnique({ where: { id: order.shopId }, select: { dealer: { select: { id: true, commissionShareBps: true } } } }))?.dealer;
+      // Own delivery: the shop keeps the delivery fee; on cash orders it also already holds the customer's cash,
+      // so that cash is netted off its earnings (the platform's commission then comes out of the shop balance).
+      const mode = (await tx.shipment.findUnique({ where: { orderId }, select: { mode: true } }))?.mode;
+      const shopEarning = mode === "OWN" ? order.shopEarning + order.deliveryFee - (order.paymentMethod === "COD" ? order.total : 0) : order.shopEarning;
       await tx.commission.upsert({
         where: { orderId },
         create: {
@@ -355,7 +359,7 @@ export async function transitionOrder(orderId: string, to: OrderStatusKey, actor
           baseAmount: order.subtotal - order.couponDiscount,
           rateBps: order.commissionBps,
           amount: order.commissionAmount,
-          shopEarning: order.shopEarning,
+          shopEarning,
           dealerId: dealer?.id ?? null,
           dealerAmount: dealer ? applyBps(order.commissionAmount, dealer.commissionShareBps) : 0,
         },
@@ -393,11 +397,9 @@ export async function afterTransition(
     const custMsg: Partial<Record<OrderStatusKey, string>> = {
       SHOP_ACCEPTED: `${o.shop.name} accepted your order and will start preparing it shortly.`,
       PREPARING: `${o.shop.name} is preparing your order.`,
-      PACKED: "Your order is packed and a delivery partner is being arranged.",
-      SHIPMENT_CREATED: "Shipment created — waiting for the delivery partner to pick up.",
-      COURIER_ASSIGNED: "A delivery partner has been assigned to your order.",
-      PICKED_UP: "Your order has been picked up.",
-      OUT_FOR_DELIVERY: "Your order is out for delivery!",
+      PACKED: "Your order is packed and will be on its way shortly.",
+      COURIER_ASSIGNED: "A rider is on the way to the shop to pick up your order.",
+      OUT_FOR_DELIVERY: "Your order is out for delivery! Share your 4-digit delivery code when it arrives.",
       DELIVERED: "Your order has been delivered. Enjoy!",
       DELIVERY_FAILED: "Delivery attempt failed. Our team will contact you.",
       SHOP_REJECTED: `${o.shop.name} could not accept your order${opts.remarks ? `: ${opts.remarks}` : "."}`,
@@ -423,17 +425,23 @@ export async function afterTransition(
       });
     }
     if (to === "DELIVERY_FAILED") {
-      await notifyShop(o.shopId, { type: "DELIVERY_ISSUE", title: `Delivery failed · ${o.orderNumber}`, body: "The courier could not deliver this order.", link: `/shop/orders/${orderId}` });
+      await notifyShop(o.shopId, { type: "DELIVERY_ISSUE", title: `Delivery failed · ${o.orderNumber}`, body: opts.remarks ? `Could not deliver: ${opts.remarks}` : "The order could not be delivered.", link: `/shop/orders/${orderId}` });
       await notifyAdmins({ type: "DELIVERY_ISSUE", title: `Delivery failed · ${o.orderNumber}`, body: `${o.shop.name} → ${o.contactName}`, link: `/admin/orders/${orderId}` });
     }
     if (to === "COURIER_ASSIGNED" || to === "PICKED_UP") {
       await notifyShop(o.shopId, {
         type: "PICKUP",
         title: to === "PICKED_UP" ? `Picked up · ${o.orderNumber}` : `Rider assigned · ${o.orderNumber}`,
-        body: to === "PICKED_UP" ? "The delivery partner has collected the order." : "Keep the package ready for pickup.",
+        body: to === "PICKED_UP" ? "The rider has collected the order." : "A rider is on the way. Keep the package ready.",
         link: `/shop/orders/${orderId}`,
       });
     }
+  }
+
+  // A cancelled order no longer needs delivering (frees the rider, if any).
+  if (to === "CANCELLED") {
+    const { cancelDelivery } = await import("./delivery");
+    await cancelDelivery(orderId);
   }
 
   // Automatic refunds for prepaid orders that will not be fulfilled.
@@ -473,12 +481,8 @@ export async function shopReject(orderId: string, actor: OrderActor, reason: str
 }
 
 export async function adminCancel(orderId: string, actor: OrderActor, reason: string) {
-  const order = await db.order.findUnique({ where: { id: orderId }, include: { shipment: true } });
+  const order = await db.order.findUnique({ where: { id: orderId } });
   if (!order) throw notFound("Order");
-  if (order.shipment && order.shipment.shiprocketOrderId && !["CANCELLED", "EXCEPTION"].includes(order.shipment.status)) {
-    const { cancelShipment } = await import("./shipment");
-    await cancelShipment(orderId, actor, { keepOrderStatus: true });
-  }
   return transitionOrder(orderId, "CANCELLED", actor, { remarks: reason, data: { cancelReason: reason, cancelledBy: "ADMIN" } });
 }
 
@@ -617,7 +621,12 @@ export const orderDetailInclude = {
   payments: { orderBy: { createdAt: "desc" } },
   refunds: { orderBy: { createdAt: "desc" } },
   statusHistory: { orderBy: { createdAt: "asc" } },
-  shipment: { include: { events: { orderBy: { occurredAt: "desc" } }, deliveryPartner: true } },
+  shipment: {
+    include: {
+      events: { orderBy: { occurredAt: "desc" } },
+      rider: { select: { id: true, vehicleType: true, vehicleNumber: true, lat: true, lng: true, locationAt: true, user: { select: { name: true, phone: true } } } },
+    },
+  },
   shop: { include: { address: true } },
   customer: { include: { user: { select: { name: true, phone: true, email: true } } } },
   modifications: { orderBy: { createdAt: "desc" } },

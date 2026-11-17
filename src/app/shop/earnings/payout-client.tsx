@@ -30,6 +30,7 @@ export function RequestPayoutButton({
   endpoint = "/shop/payouts",
   source = "after platform commission",
   reviewer = "The admin will transfer it and share the transaction details here.",
+  label = "Request payout",
 }: {
   amount: number;
   orders: number;
@@ -40,6 +41,8 @@ export function RequestPayoutButton({
   source?: string;
   /** Who checks / pays the request. */
   reviewer?: string;
+  /** Button text, e.g. "Withdraw" for riders. */
+  label?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export function RequestPayoutButton({
   return (
     <>
       <Button size="lg" className="w-full sm:w-auto" disabled={!!disabledReason} onClick={() => setOpen(true)}>
-        <Send /> Request payout
+        <Send /> {label}
       </Button>
       {disabledReason && <p className="mt-1.5 text-xs text-muted-foreground">{disabledReason}</p>}
       <AlertDialog open={open} onOpenChange={setOpen}>
@@ -72,7 +75,7 @@ export function RequestPayoutButton({
                 setBusy(true);
                 try {
                   await api(endpoint, { method: "POST" });
-                  toast.success("Payout requested");
+                  toast.success(`${label} requested`);
                   setOpen(false);
                   router.refresh();
                 } catch (err) {
@@ -82,7 +85,7 @@ export function RequestPayoutButton({
                 }
               }}
             >
-              {busy && <Loader2 className="animate-spin" />} Request payout
+              {busy && <Loader2 className="animate-spin" />} {label}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

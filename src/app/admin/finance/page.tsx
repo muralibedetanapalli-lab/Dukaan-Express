@@ -9,6 +9,7 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
 import { payoutStatus } from "@/lib/payout";
 import { revealBankAccount } from "@/server/services/payout";
 import { revealDealerBank } from "@/server/services/dealer";
+import { revealRiderBank } from "@/server/services/rider";
 import { CopyValue, GenerateSettlement, MarkPaid, RejectPayout } from "./finance-actions";
 
 export const metadata = { title: "Commission & payouts" };
@@ -58,13 +59,14 @@ function BankDetails({ bank, missing }: { bank: RevealedBank; missing: string })
 
 export default async function FinancePage() {
   const settings = await getSettings();
-  const [unsettled, settlements, totals, shops, dealers, dealerPayouts] = await Promise.all([
+  const [unsettled, settlements, totals, shops, dealers, dealerPayouts, riderWithdrawals] = await Promise.all([
     db.commission.groupBy({ by: ["shopId"], where: { settlementId: null }, _sum: { baseAmount: true, amount: true, shopEarning: true }, _count: true, _min: { createdAt: true }, _max: { createdAt: true } }),
     db.shopSettlement.findMany({ include: { shop: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.commission.aggregate({ _sum: { amount: true, shopEarning: true, baseAmount: true, dealerAmount: true } }),
     db.shop.findMany({ where: { deletedAt: null }, select: { id: true, name: true, commissionBps: true } }),
     db.dealer.findMany({ select: { id: true, user: { select: { name: true } } } }),
     db.dealerPayout.findMany({ include: { dealer: { select: { user: { select: { name: true } } } } }, orderBy: { createdAt: "desc" }, take: 50 }),
+    db.riderWithdrawal.findMany({ include: { rider: { select: { user: { select: { name: true, phone: true } } } } }, orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   const shopById = new Map(shops.map((s) => [s.id, s]));
   const dealerName = new Map(dealers.map((d) => [d.id, d.user.name ?? "Dealer"]));
@@ -74,10 +76,14 @@ export default async function FinancePage() {
   const history = settlements.filter((s) => !openPayouts.includes(s) && !withDealer.includes(s));
   const openDealerPayouts = dealerPayouts.filter((p) => p.status === "PENDING" || p.status === "PROCESSING");
   const dealerHistory = dealerPayouts.filter((p) => !openDealerPayouts.includes(p));
+  const openRiderWithdrawals = riderWithdrawals.filter((w) => w.status === "PENDING" || w.status === "PROCESSING");
+  const riderWithDealer = riderWithdrawals.filter((w) => w.status === "DEALER_REVIEW");
+  const riderHistory = riderWithdrawals.filter((w) => !openRiderWithdrawals.includes(w) && !riderWithDealer.includes(w));
   // Full bank details are decrypted only for payouts waiting on a transfer.
-  const [banks, dealerBanks] = await Promise.all([
+  const [banks, dealerBanks, riderBanks] = await Promise.all([
     Promise.all([...new Set(openPayouts.map((p) => p.shopId))].map(async (id) => [id, await revealBankAccount(id)] as const)).then((e) => new Map(e)),
     Promise.all([...new Set(openDealerPayouts.map((p) => p.dealerId))].map(async (id) => [id, await revealDealerBank(id)] as const)).then((e) => new Map(e)),
+    Promise.all([...new Set(openRiderWithdrawals.map((w) => w.riderId))].map(async (id) => [id, await revealRiderBank(id)] as const)).then((e) => new Map(e)),
   ]);
 
   return (
@@ -205,6 +211,73 @@ export default async function FinancePage() {
                     {p.status === "PAID" && (
                       <p>
                         {p.payoutMethod ?? "Transfer"} · <span className="font-mono">{p.reference}</span> · {fmtDate(p.paidAt)}
+                      </p>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      <Card className="gap-0 overflow-hidden p-0">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <p className="font-semibold">Rider withdrawals</p>
+          {openRiderWithdrawals.length > 0 && <Pill tone="warning">{openRiderWithdrawals.length} waiting</Pill>}
+        </div>
+        {openRiderWithdrawals.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No rider withdrawals waiting{riderWithDealer.length ? ` · ${riderWithDealer.length} still with dealers` : ""}</p>
+        ) : (
+          <div className="divide-y">
+            {openRiderWithdrawals.map((w) => (
+              <div key={w.id} className="grid gap-4 p-4 md:grid-cols-[1fr_1.3fr_auto] md:items-center">
+                <div>
+                  <p className="font-semibold">{w.rider.user.name}</p>
+                  <p className="text-2xl font-bold tabular-nums text-primary">{formatINR(w.amount)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {w.rider.user.phone} · requested {fmtDateTime(w.createdAt)}
+                  </p>
+                  {w.dealerReviewedAt && w.dealerId && (
+                    <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      ✓ Approved by {dealerName.get(w.dealerId) ?? "dealer"} · {fmtDateTime(w.dealerReviewedAt)}
+                    </p>
+                  )}
+                </div>
+                <BankDetails bank={riderBanks.get(w.riderId) ?? null} missing="This rider hasn't added a bank account." />
+                <div className="flex gap-2 md:flex-col">
+                  <MarkPaid id={w.id} amount={w.amount} shopName={w.rider.user.name ?? "rider"} base="/admin/rider-withdrawals" />
+                  <RejectPayout id={w.id} base="/admin/rider-withdrawals" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {riderHistory.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rider</TableHead>
+                <TableHead>Requested</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Transaction</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {riderHistory.slice(0, 15).map((w) => (
+                <TableRow key={w.id}>
+                  <TableCell className="font-semibold">{w.rider.user.name}</TableCell>
+                  <TableCell className="text-xs">{fmtDate(w.createdAt)}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatINR(w.amount)}</TableCell>
+                  <TableCell>
+                    <Pill tone={payoutStatus(w.status).tone}>{payoutStatus(w.status).label}</Pill>
+                    {w.status === "REJECTED" && w.rejectionReason && <p className="mt-0.5 max-w-48 text-xs text-muted-foreground">{w.rejectionReason}</p>}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {w.status === "PAID" && (
+                      <p>
+                        {w.payoutMethod ?? "Transfer"} · <span className="font-mono">{w.reference}</span> · {fmtDate(w.paidAt)}
                       </p>
                     )}
                   </TableCell>

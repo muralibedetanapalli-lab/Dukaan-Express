@@ -46,6 +46,7 @@ export const zShopInput = z.object({
   deliveryRadiusKm: z.number().min(0.5).max(50),
   commissionBps: z.number().int().min(0).max(5000).optional().nullable(),
   avgPrepMinutes: z.number().int().min(1).max(120).default(10),
+  deliveryMode: z.enum(["OWN", "RIDER"]).optional(),
   address: z.object({
     line1: z.string().trim().min(3).max(200),
     line2: z.string().trim().max(200).optional().nullable(),
@@ -89,6 +90,7 @@ export async function createShop(actor: SessionUser, input: ShopInput, opts: { d
       deliveryRadiusKm: input.deliveryRadiusKm,
       commissionBps: input.commissionBps ?? null,
       avgPrepMinutes: input.avgPrepMinutes,
+      deliveryMode: input.deliveryMode ?? "RIDER",
       // Admin-created shops are approved but start inactive until explicitly activated;
       // shops onboarded by a dealer go live straight away.
       approvalStatus: "APPROVED",
@@ -115,10 +117,6 @@ export async function updateShop(actor: SessionUser, shopId: string, input: Part
         ...rest,
         ...(rest.name && rest.name !== before.name ? { slug: await uniqueShopSlug(rest.name, shopId) } : {}),
         ...(rest.categoryId === "" ? { categoryId: null } : {}),
-        ...(address &&
-        (address.pincode !== before.address?.pincode || address.line1 !== before.address?.line1)
-          ? { pickupLocationName: null } // force re-registration of the Shiprocket pickup address
-          : {}),
       },
     });
     if (address) await tx.shopAddress.upsert({ where: { shopId }, create: { shopId, ...address }, update: address });

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader, StatCard } from "@/components/shared/misc";
 import { bpsToPercent, formatINR } from "@/lib/money";
 import { PendingPayoutReviews } from "./payout-list";
+import { PendingRiderWithdrawals } from "./rider-withdrawals";
 
 export const metadata = { title: "Dealer home" };
 
@@ -18,7 +19,7 @@ export default async function DealerHome() {
     db.dealer.findUniqueOrThrow({ where: { id: dealerId } }),
     db.shop.count({ where: { dealerId, deletedAt: null } }),
     db.shop.count({ where: { dealerId, deletedAt: null, isActive: true, approvalStatus: "APPROVED" } }),
-    db.shopSettlement.count({ where: { status: "DEALER_REVIEW", shop: { dealerId } } }),
+    db.shopSettlement.count({ where: { status: "DEALER_REVIEW", shop: { dealerId } } }).then(async (n) => n + (await db.riderWithdrawal.count({ where: { status: "DEALER_REVIEW", rider: { dealerId } } }))),
     dealerBalance(dealerId),
     db.serviceArea.findMany({ where: { dealerId }, orderBy: { city: "asc" }, select: { id: true, city: true, state: true, pincodes: true } }),
   ]);
@@ -39,7 +40,7 @@ export default async function DealerHome() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="My shops" value={shops} hint={`${live} live`} icon={Store} tone="primary" href="/dealer/shops" />
-        <StatCard label="To approve" value={pending} hint="payout requests" icon={BadgeCheck} tone={pending ? "warning" : "default"} href="/dealer/payouts" />
+        <StatCard label="To approve" value={pending} hint="shop & rider payouts" icon={BadgeCheck} tone={pending ? "warning" : "default"} href="/dealer/payouts" />
         <StatCard label="My earnings" value={formatINR(balance.amount)} hint={`from ${balance.orders} orders`} icon={IndianRupee} tone="success" href="/dealer/earnings" />
         <StatCard label="Regions" value={regions.length} hint={regions.map((r) => r.city).join(", ") || "none yet"} icon={MapPin} />
       </div>
@@ -54,6 +55,7 @@ export default async function DealerHome() {
           )}
         </div>
         <PendingPayoutReviews dealerId={dealerId} limit={3} />
+        <PendingRiderWithdrawals dealerId={dealerId} limit={3} />
       </section>
 
       {regions.length === 0 && (

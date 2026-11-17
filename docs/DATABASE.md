@@ -6,7 +6,7 @@ PostgreSQL via Prisma 7 (`prisma/schema.prisma`, migrations in `prisma/migration
 - Primary keys are `cuid()` strings; all money is integer **paise**; rates are **basis points** (1% = 100).
 - `createdAt` / `updatedAt` on every mutable table; soft delete (`deletedAt`) on `User`, `Shop`, `Category`, `Product`, `ShopInventory`, `CustomerAddress`.
 - Every status change of an order is written to `OrderStatusHistory` in the same transaction.
-- Webhooks are de-duplicated by the unique key `(provider, eventId)`; shipments by unique `orderId`, `channelOrderId` and `awbCode`.
+- Webhooks are de-duplicated by the unique key `(provider, eventId)`; deliveries by unique `orderId`; rider wallet entries by unique `(orderId, type)`.
 
 ## Entity relationship diagram
 
@@ -56,7 +56,9 @@ erDiagram
   Order ||--o{ Refund : refunds
   Order ||--o| Shipment : "shipped by"
   Shipment ||--o{ ShipmentTrackingEvent : tracking
-  Shipment }o--o| DeliveryPartner : courier
+  Shipment }o--o| Rider : delivers
+  Rider ||--o{ RiderWalletEntry : wallet
+  Rider ||--o{ RiderWithdrawal : withdraws
   Order ||--o| Commission : "commission"
   Commission }o--o| ShopSettlement : "settled in"
   Order ||--o| Review : rated
@@ -83,7 +85,7 @@ erDiagram
 | `User` | One row per login. `role` ∈ SUPER_ADMIN, SHOP_OWNER, CUSTOMER. Unique `email`, `phone`. `sessionVersion` revokes JWTs. |
 | `Role` | Reference table of roles and their permission descriptors. |
 | `Customer`, `ShopOwner` | Role profiles (1:1 with `User`). |
-| `Shop` | Approval (`approvalStatus`) is separate from operational state (`isActive`, `acceptingOrders`). `commissionBps` null → platform default. `pickupLocationName` = nickname registered with Shiprocket. |
+| `Shop` | Approval (`approvalStatus`) is separate from operational state (`isActive`, `acceptingOrders`). `commissionBps` null → platform default. `deliveryMode` = OWN (shop's staff) or RIDER (Dukaan Express riders). |
 | `Product` | **Global master** (name, category, dimensions, images). Independent of any shop. |
 | `ShopInventory` | **Shop-specific** price/MRP/stock/availability. Unique `(shopId, productId, variantKey)` — `variantKey` makes the key NULL-safe. |
 | `Cart` / `CartItem` | Lines carry `shopId` so a future checkout can split into per-shop orders. |
@@ -92,7 +94,10 @@ erDiagram
 | `OrderStatusHistory` | from → to, actor id + role, remarks, timestamp. |
 | `OrderModification` | Shop-requested reductions that require admin approval. |
 | `Payment` / `Refund` | Cashfree order/payment ids unique; refund statuses PENDING → PROCESSING → PROCESSED/FAILED. |
-| `Shipment` | One per order; `channelOrderId` is the idempotency key sent to Shiprocket. Stores Shiprocket order/shipment ids, AWB, courier, label, pickup, attempts, last error. |
+| `Shipment` | The delivery: one per order. `mode` OWN / RIDER, `riderId`, `riderFee` (what the rider earns), `codAmount`, `deliveryCode` (customer's 4-digit handover code), timestamps for search / assign / pickup / delivery. |
+| `Rider` | Delivery rider (role RIDER), onboarded by a dealer. `isOnline`, last `lat`/`lng`/`locationAt` (shown to the customer during their delivery). |
+| `RiderWalletEntry` | Ledger: + delivery earning, − COD cash collected, − withdrawal (set aside), + reversal. Balance = sum. |
+| `RiderWithdrawal` | Rider withdrawal: DEALER_REVIEW → PENDING (admin) → PAID with UTR, or REJECTED / CANCELLED (money back to wallet). |
 | `ShipmentTrackingEvent` | Raw + mapped status, location, source (WEBHOOK/POLL/SYSTEM). |
 | `Commission` / `ShopSettlement` | Commission recorded on delivery; unsettled commissions are the shop's available balance. A settlement is a payout: requested by the owner (or created by admin), then PAID with UTR / method / receipt, or REJECTED / CANCELLED (orders return to the balance). |
 | `ShopBankAccount` | One per shop. Account number AES-256-GCM encrypted (key from `FIELD_ENCRYPTION_KEY`, else derived from `JWT_SECRET`); only the last 4 digits are shown to the owner. |

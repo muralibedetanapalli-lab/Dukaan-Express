@@ -3,8 +3,8 @@
  *
  * In-process maintenance: while the app is awake it calls its own maintenance endpoint shortly after
  * start-up and then every few minutes. With Azure scale-to-zero (min replicas 0) the app only runs when
- * someone uses it, so pending work (unpaid-order expiry, shop accept timeouts, missed refunds, stuck
- * shipments) is handled as soon as anyone visits — without an external job waking the app every 15 minutes.
+ * someone uses it, so pending work (unpaid-order expiry, shop accept timeouts, missed refunds, deliveries
+ * waiting for a rider) is handled as soon as anyone visits — without an external job waking the app every 15 minutes.
  * The call goes to localhost, so it never counts as traffic that keeps the replica alive.
  *
  * Enabled in production when CRON_SECRET is set; set IN_PROCESS_MAINTENANCE=false to turn it off.
@@ -28,7 +28,7 @@ export async function register() {
       const res = await fetch(url, { headers: { authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(90_000) });
       const body = await res.text();
       if (!res.ok) console.warn(`[maintenance] ${res.status} ${body.slice(0, 200)}`);
-      else if (!/"expired":0,"refundsSettled":0,"autoRejected":0,"reconciled":0/.test(body)) console.info(`[maintenance] ${body.slice(0, 300)}`);
+      else if (!/"expired":0,"refundsSettled":0,"autoRejected":0,"waitingForRider":0,"noRiderAlerts":0/.test(body)) console.info(`[maintenance] ${body.slice(0, 300)}`);
     } catch (e) {
       console.warn("[maintenance] failed:", e instanceof Error ? e.message : e);
     } finally {

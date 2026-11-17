@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  Bike,
   Boxes,
   ClipboardList,
   FileSpreadsheet,
@@ -41,6 +42,7 @@ const NAV = [
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/shipments", label: "Deliveries", icon: Truck, badge: "shipments" },
+  { href: "/admin/riders", label: "Riders", icon: Bike },
   { href: "/admin/finance", label: "Commission & payouts", icon: IndianRupee },
   { href: "/admin/reports", label: "Reports", icon: FileSpreadsheet },
   { href: "/admin/marketing", label: "Coupons & banners", icon: Megaphone },

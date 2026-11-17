@@ -14,7 +14,7 @@ export function appConfig(opts: {
   dir: string;
   appId: string;
   appName: string;
-  role: "customer" | "shop";
+  role: "customer" | "shop" | "rider";
   startPath: string;
   splashColor: string;
 }): CapacitorConfig {

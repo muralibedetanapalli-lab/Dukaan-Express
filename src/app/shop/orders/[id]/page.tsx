@@ -4,7 +4,6 @@ import { getSessionUser } from "@/server/auth/session";
 import { AppError } from "@/server/errors";
 import { getOrderForActor } from "@/server/services/order";
 import { SHOP_FORWARD_ACTION } from "@/server/services/order-state";
-import { integrationModes } from "@/server/env";
 import { Card } from "@/components/ui/card";
 import { PageHeader, ProductThumb, KeyValue } from "@/components/shared/misc";
 import { OrderStatusBadge, PaymentBadge, Pill } from "@/components/shared/status-badge";
@@ -12,7 +11,7 @@ import { formatINR } from "@/lib/money";
 import { fmtDateTime } from "@/lib/format";
 import type { OrderStatusKey } from "@/lib/order-status";
 import { ShopOrderActions } from "./shop-order-actions";
-import { ShipmentPanel } from "@/components/shared/shipment-panel";
+import { DeliveryPanel } from "@/components/shared/delivery-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -77,13 +76,7 @@ export default async function ShopOrderPage({ params }: { params: Promise<{ id: 
               <StickyNote className="size-4 shrink-0 text-amber-600" /> {order.notes}
             </Card>
           )}
-          <ShipmentPanel
-            orderId={order.id}
-            role="shop"
-            orderStatus={order.status}
-            shipment={order.shipment}
-            sandbox={integrationModes().shiprocket === "mock"}
-          />
+          <DeliveryPanel orderId={order.id} role="shop" orderStatus={order.status} shopMode={order.shop.deliveryMode} delivery={order.shipment} />
         </div>
         <div className="space-y-4">
           <Card className="gap-0 p-4">
@@ -96,7 +89,11 @@ export default async function ShopOrderPage({ params }: { params: Promise<{ id: 
             <KeyValue label="Your earning" className="font-bold">
               <span className="text-primary">{formatINR(order.shopEarning)}</span>
             </KeyValue>
-            {order.paymentMethod === "COD" && <Pill tone="warning" className="mt-2">Collect {formatINR(order.total)} cash via courier</Pill>}
+            {order.paymentMethod === "COD" && (
+              <Pill tone="warning" className="mt-2">
+                Cash on delivery {formatINR(order.total)} · {(order.shipment?.mode ?? order.shop.deliveryMode) === "OWN" ? "your staff collects it" : "the rider collects it"}
+              </Pill>
+            )}
           </Card>
           <Card className="gap-1 p-4 text-sm">
             <p className="flex items-center gap-2 font-semibold">

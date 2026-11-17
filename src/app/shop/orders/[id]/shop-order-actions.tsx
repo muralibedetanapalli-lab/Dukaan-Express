@@ -17,7 +17,7 @@ const ACTION: Record<string, { action: string; icon: typeof CheckCircle2; confir
   SHOP_ACCEPTED: { action: "accept", icon: CheckCircle2 },
   PREPARING: { action: "start_preparing", icon: ChefHat },
   READY_FOR_PACKING: { action: "ready_for_packing", icon: PackageOpen },
-  PACKED: { action: "packed", icon: PackageCheck, confirm: "Confirm all items are packed. A Shiprocket shipment will be created and a courier requested." },
+  PACKED: { action: "packed", icon: PackageCheck, confirm: "Confirm all items are packed. The order then goes out for delivery — with a Dukaan Express rider or your own staff, per your delivery setting." },
 };
 
 export function ShopOrderActions({
@@ -40,11 +40,8 @@ export function ShopOrderActions({
   async function run(action: string) {
     setBusy(true);
     try {
-      const r = await api<{ status: string; shipment?: { ok: boolean; error: string | null } }>(`/shop/orders/${orderId}/action`, { body: { action } });
-      if (r.shipment) {
-        if (r.shipment.ok) toast.success("Packed! Shipment created — awaiting courier pickup.");
-        else toast.warning(`Packed, but shipment could not be created: ${r.shipment.error}`);
-      } else toast.success("Order updated");
+      const r = await api<{ status: string }>(`/shop/orders/${orderId}/action`, { body: { action } });
+      toast.success(r.status === "SHIPMENT_CREATED" ? "Packed! Nearby riders have been alerted." : action === "packed" ? "Packed! Send it out for delivery when ready." : "Order updated");
       router.refresh();
     } catch (e) {
       toast.error(errorMessage(e));

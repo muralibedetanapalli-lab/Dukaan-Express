@@ -37,7 +37,9 @@ export default async function ShippingPage() {
 
       <Section title="4. How your order is delivered">
         <List>
-          <li>Once the shop packs your order, a delivery partner (through Shiprocket or the shop&apos;s own staff) picks it up and brings it to your address.</li>
+          <li>Once the shop packs your order, it is delivered either by a {c.brand} delivery rider or by the shop&apos;s own staff. You can see which on your order page.</li>
+          <li>When a {c.brand} rider is delivering, you can follow their live location on a map in the app.</li>
+          <li>Your order page shows a 4-digit delivery code. Give it to the delivery person only when you receive your order; it confirms the delivery.</li>
           <li>You receive updates when the order is accepted, packed, picked up, out for delivery and delivered.</li>
           <li>Please check the package at delivery. Report anything missing or damaged as described in our Cancellation &amp; Refund Policy.</li>
         </List>

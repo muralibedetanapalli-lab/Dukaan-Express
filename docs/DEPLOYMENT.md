@@ -35,12 +35,8 @@ Each integration switches from its sandbox adapter to live automatically once it
 3. Whitelist your domain in Cashfree (Developers → Whitelisting) before production; checkout from un-whitelisted domains is blocked.
 4. Payments are never confirmed from the browser: after checkout the server re-reads the order and its payments from Cashfree and checks the amount. Webhooks reach the same result independently.
 
-### Shiprocket
-1. Create an API user (Settings → API → Configure) → `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD`.
-2. Optional `SHIPROCKET_CHANNEL_ID` for a custom channel.
-3. Webhook: Settings → API → Webhooks → URL `https://<domain>/api/v1/webhooks/courier` (alias without the word "shiprocket", which some accounts reject) and a token → `SHIPROCKET_WEBHOOK_TOKEN` (sent as `x-api-key`).
-4. Each shop's address is auto-registered as a Shiprocket pickup location (`DX-<shop-slug>`) on its first shipment. Shiprocket may require verifying a new pickup address's phone number from its panel before pickups are accepted.
-5. **Instant delivery is not guaranteed by Shiprocket.** The app checks serviceability and couriers on every shipment; if none is available the shipment goes to `EXCEPTION` and admins/shops can retry or pick another courier. Hyperlocal partners appear only if enabled on your Shiprocket account.
+### Deliveries and riders
+No courier account is needed. Set each shop's delivery mode, add riders (Dealer → Riders or Admin → Riders), and give riders the **Dukaan Rider** app (`mobile/rider`). For job alerts on riders' phones, add an Android app `in.dukaanexpress.rider` to the same Firebase project and put its `google-services.json` in `mobile/rider/android/app/` before building.
 
 ### Google Maps
 `GOOGLE_MAPS_API_KEY` (server; Distance Matrix + Geocoding APIs). Without it, distances use haversine × 1.3 and reverse geocoding falls back to the nearest service area.
@@ -59,6 +55,6 @@ Create a service account with the *Firebase Cloud Messaging API* role → `FCM_P
 - [ ] `JWT_SECRET` and `CRON_SECRET` are long random values, unique per environment.
 - [ ] Change all seeded passwords (or never seed production).
 - [ ] `APP_URL` uses https; cookies are `Secure` automatically in production.
-- [ ] Cashfree webhook URL and Shiprocket webhook token configured (unsigned webhooks are rejected).
+- [ ] Cashfree webhook URL configured (unsigned webhooks are rejected).
 - [ ] Database user has least privilege; backups enabled.
 - [ ] Rate limiter backed by Redis if running more than one instance.

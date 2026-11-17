@@ -1,11 +1,12 @@
 # Dukaan Express Android apps
 
-Two Capacitor apps that load the live website and add native features:
+Three Capacitor apps that load the live website and add native features:
 
 | App | Package | Opens | Native extras |
 |---|---|---|---|
 | **Dukaan Express** (customers) | `in.dukaanexpress.customer` | `/` | GPS location, push notifications |
 | **Dukaan Partner** (shop owners) | `in.dukaanexpress.shop` | `/shop` | Camera/gallery for product photos, loud "new order" push channel |
+| **Dukaan Rider** (delivery riders) | `in.dukaanexpress.rider` | `/rider` | GPS live location while online (foreground), screen kept on during a delivery, loud "new delivery" push channel |
 
 Both have a splash screen that covers Azure's scale-to-zero cold start, an offline screen with *Try again*, Android back-button navigation, and edge-to-edge layout. **Most changes ship by deploying the website** — rebuild the apps only for native changes (icons, permissions, plugins, version bumps).
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { api } from "@/server/http";
 import { badRequest } from "@/server/errors";
 import { getOrderForActor, shopReject, transitionOrder } from "@/server/services/order";
-import { createShipmentForOrder } from "@/server/services/shipment";
+import { startDelivery } from "@/server/services/delivery";
 
 const ACTION_TO_STATUS = {
   accept: "SHOP_ACCEPTED",
@@ -13,7 +13,7 @@ const ACTION_TO_STATUS = {
 
 /**
  * Shop workflow buttons: Accept Order, Reject Order, Start Preparing, Ready for Packing, Order Packed.
- * "packed" also kicks off the Shiprocket shipment workflow.
+ * "packed" also starts the delivery (looks for a rider, or waits for the shop's own staff).
  */
 export const POST = api(
   {
@@ -33,9 +33,9 @@ export const POST = api(
     }
     await transitionOrder(params.id, ACTION_TO_STATUS[body.action], actor, { remarks: body.reason ?? null });
     if (body.action === "packed") {
-      const shipment = await createShipmentForOrder(params.id, actor);
+      await startDelivery(params.id, actor);
       const order = await getOrderForActor(params.id, actor);
-      return { status: order.status, shipment: { ok: shipment.ok, error: shipment.ok ? null : shipment.error } };
+      return { status: order.status };
     }
     return { status: ACTION_TO_STATUS[body.action] };
   },

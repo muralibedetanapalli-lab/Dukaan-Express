@@ -123,6 +123,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
               deliveryRadiusKm: String(shop.deliveryRadiusKm),
               commissionPercent: shop.commissionBps == null ? "" : String(shop.commissionBps / 100),
               avgPrepMinutes: String(shop.avgPrepMinutes),
+              deliveryMode: shop.deliveryMode,
               address: {
                 line1: a?.line1 ?? "",
                 line2: a?.line2 ?? "",
@@ -141,7 +142,6 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
               })),
             }}
           />
-          {shop.pickupLocationName && <p className="mt-3 text-xs text-muted-foreground">Shiprocket pickup location: {shop.pickupLocationName}</p>}
         </TabsContent>
         <TabsContent value="inventory" className="mt-4">
           <Card className="gap-0 overflow-hidden p-0">

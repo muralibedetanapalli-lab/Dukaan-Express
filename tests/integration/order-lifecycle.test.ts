@@ -3,9 +3,16 @@ import { db } from "@/server/db";
 import { addToCart, getCartView } from "@/server/services/cart";
 import { cancelByCustomer, placeOrder, transitionOrder, requestModification, reviewModification } from "@/server/services/order";
 import { startPayment, verifyPayment } from "@/server/services/payment";
-import { createShipmentForOrder, simulateNextCourierEvent, handleShiprocketWebhook } from "@/server/services/shipment";
+import { acceptJob, completeDelivery, dispatchOwn, failDelivery, pickUp, releaseJob, startDelivery } from "@/server/services/delivery";
+import { cancelWithdrawal, markWithdrawalPaid, rejectWithdrawal, requestWithdrawal, reviewWithdrawal, saveRiderBank, walletBalance } from "@/server/services/rider";
+import { createDealer } from "@/server/services/dealer";
+import { zBankInput } from "@/server/services/payout";
+import type { SessionUser } from "@/server/auth/session";
 import { AppError } from "@/server/errors";
-import { fixture, resetDb } from "./helpers";
+import { fixture, makeRider, resetDb } from "./helpers";
+
+const asUser = (a: object) => a as unknown as SessionUser;
+const codeOf = async (orderId: string) => (await db.shipment.findUniqueOrThrow({ where: { orderId } })).deliveryCode;
 
 async function statusOf(id: string) {
   return (await db.order.findUniqueOrThrow({ where: { id } })).status;
@@ -14,7 +21,7 @@ async function statusOf(id: string) {
 describe("order lifecycle (integration)", () => {
   beforeEach(resetDb);
 
-  it("COD order: place → accept → prepare → pack → Shiprocket (sandbox) → delivered, with commission", async () => {
+  it("COD order: place → accept → prepare → pack → rider accepts, picks up, delivers with code → commission + rider wallet", async () => {
     const f = await fixture();
     await addToCart(f.customer.customerId, f.inv1.id, 2, false);
     const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "COD" });
@@ -28,15 +35,29 @@ describe("order lifecycle (integration)", () => {
     for (const to of ["SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING", "PACKED"] as const) {
       await transitionOrder(order.id, to, f.owner);
     }
-    const ship = await createShipmentForOrder(order.id, f.owner);
-    expect(ship.ok).toBe(true);
-    expect(ship.shipment.awbCode).toMatch(/^MOCKAWB/);
+    const ship = await startDelivery(order.id, f.owner);
+    expect(ship).toMatchObject({ mode: "RIDER", status: "CREATED", riderFee: 2500, codAmount: 54000 });
+    expect(ship.deliveryCode).toMatch(/^\d{4}$/);
     expect(await statusOf(order.id)).toBe("SHIPMENT_CREATED");
 
-    for (const expected of ["COURIER_ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "DELIVERED"]) {
-      await simulateNextCourierEvent(order.id);
-      expect(await statusOf(order.id)).toBe(expected);
-    }
+    const rider = await makeRider();
+    await acceptJob(asUser(rider), ship.id);
+    expect(await statusOf(order.id)).toBe("COURIER_ASSIGNED");
+    await expect(completeDelivery(asUser(rider), order.id, ship.deliveryCode)).rejects.toMatchObject({ status: 409 }); // not picked up yet
+    await pickUp(asUser(rider), ship.id);
+    expect(await statusOf(order.id)).toBe("OUT_FOR_DELIVERY");
+    const wrong = ship.deliveryCode === "0000" ? "1111" : "0000";
+    await expect(completeDelivery(asUser(rider), order.id, wrong)).rejects.toMatchObject({ status: 400 });
+    await completeDelivery(asUser(rider), order.id, ship.deliveryCode);
+    expect(await statusOf(order.id)).toBe("DELIVERED");
+
+    // Rider earns the delivery fee (even though the customer got free delivery) and owes the COD cash.
+    const entries = await db.riderWalletEntry.findMany({ where: { riderId: rider.riderId }, orderBy: { amount: "desc" } });
+    expect(entries.map((e) => [e.type, e.amount])).toEqual([
+      ["DELIVERY_EARNING", 2500],
+      ["COD_COLLECTED", -54000],
+    ]);
+    expect(await walletBalance(rider.riderId)).toBe(-51500);
 
     const done = await db.order.findUniqueOrThrow({ where: { id: order.id }, include: { commission: true, payments: true, statusHistory: true } });
     expect(done.paymentStatus).toBe("CAPTURED");
@@ -44,7 +65,7 @@ describe("order lifecycle (integration)", () => {
     expect(done.commission?.shopEarning).toBe(48600);
     expect(done.statusHistory.map((h) => h.toStatus)).toEqual([
       "CREATED", "SHOP_PENDING", "SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING", "PACKED",
-      "SHIPMENT_CREATING", "SHIPMENT_CREATED", "COURIER_ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "DELIVERED",
+      "SHIPMENT_CREATED", "COURIER_ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY", "DELIVERED",
     ]);
   });
 
@@ -169,47 +190,128 @@ describe("order lifecycle (integration)", () => {
   });
 });
 
-describe("Shiprocket integration safeguards (sandbox adapter)", () => {
+describe("deliveries: riders and own staff", () => {
   beforeEach(resetDb);
 
-  async function packedOrder(pincode: string) {
-    const f = await fixture({ deliveryPincode: pincode });
+  async function packedOrder(paymentMethod: "COD" | "UPI" = "COD", existing?: Awaited<ReturnType<typeof fixture>>) {
+    const f = existing ?? (await fixture());
     await addToCart(f.customer.customerId, f.inv1.id, 1, false);
     const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "COD" });
+    if (paymentMethod === "UPI") await db.order.update({ where: { id: order.id }, data: { paymentMethod: "UPI", paymentStatus: "CAPTURED" } });
     for (const to of ["SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING", "PACKED"] as const) await transitionOrder(order.id, to, f.owner);
     return { f, order };
   }
 
-  it("raises a shipment exception when no courier is serviceable and allows retry", async () => {
-    const { f, order } = await packedOrder("560999");
-    const r = await createShipmentForOrder(order.id, f.owner);
-    expect(r.ok).toBe(false);
-    expect(r.shipment.status).toBe("EXCEPTION");
+  it("only one rider can take a job; a rider can give it back before pickup", async () => {
+    const { f, order } = await packedOrder();
+    const ship = await startDelivery(order.id, f.owner);
+    const [a, b] = await Promise.all([makeRider(), makeRider()]);
+    const results = await Promise.allSettled([acceptJob(asUser(a), ship.id), acceptJob(asUser(b), ship.id)]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const winner = results[0].status === "fulfilled" ? a : b;
+    const loser = winner === a ? b : a;
+
+    // The other rider can't act on it; the winner gives it back and the loser picks it up instead.
+    await expect(pickUp(asUser(loser), ship.id)).rejects.toMatchObject({ status: 404 });
+    await releaseJob(asUser(winner), ship.id, "Bike puncture");
+    expect(await statusOf(order.id)).toBe("SHIPMENT_CREATED");
+    await acceptJob(asUser(loser), ship.id);
+    expect((await db.shipment.findUniqueOrThrow({ where: { id: ship.id } })).attempts).toBe(2);
+
+    // A rider can only carry one delivery at a time.
+    const second = await packedOrder("COD", f);
+    const s2 = await startDelivery(second.order.id, f.owner);
+    await expect(acceptJob(asUser(loser), s2.id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("own delivery: shop dispatches and completes with the code, keeps the fee, COD cash is netted", async () => {
+    const { f, order } = await packedOrder();
+    await db.shop.update({ where: { id: f.shop.id }, data: { deliveryMode: "OWN" } });
+    const ship = await startDelivery(order.id, f.owner);
+    expect(ship).toMatchObject({ mode: "OWN", status: "PENDING", riderFee: 0 });
     expect(await statusOf(order.id)).toBe("PACKED");
-    // a second attempt is allowed (still no courier) and counts attempts
-    const r2 = await createShipmentForOrder(order.id, f.owner);
-    expect(r2.shipment.attempts).toBe(2);
+
+    const owner = asUser({ ...f.owner, name: "Owner" });
+    await dispatchOwn(owner, order.id);
+    expect(await statusOf(order.id)).toBe("OUT_FOR_DELIVERY");
+    await failDelivery(owner, order.id, "Customer not reachable");
+    expect(await statusOf(order.id)).toBe("DELIVERY_FAILED");
+    await dispatchOwn(owner, order.id); // try again
+    await completeDelivery(owner, order.id, await codeOf(order.id));
+
+    const o = await db.order.findUniqueOrThrow({ where: { id: order.id }, include: { commission: true } });
+    expect(o.status).toBe("DELIVERED");
+    // items ₹270, commission 10% = ₹27, delivery fee ₹25 kept, the ₹295 cash is already with the shop → shop owes ₹27.
+    expect(o.deliveryFee).toBe(2500);
+    expect(o.total).toBe(29500);
+    expect(o.commission).toMatchObject({ amount: 2700, shopEarning: -2700 });
+    expect(await db.riderWalletEntry.count()).toBe(0);
   });
 
-  it("does not create duplicate shipments when the create call times out", async () => {
-    const { f, order } = await packedOrder("560998");
-    const r = await createShipmentForOrder(order.id, f.owner);
-    // the simulated timeout is reconciled by looking the channel order up
-    expect(r.ok).toBe(true);
-    const shipments = await db.shipment.findMany({ where: { orderId: order.id } });
-    expect(shipments).toHaveLength(1);
-    expect(shipments[0].shiprocketShipmentId).toMatch(/^MOCK-SHP-/);
-    await expect(createShipmentForOrder(order.id, f.owner)).rejects.toMatchObject({ status: 409 });
+  it("rider shop with no rider: the shop can switch the order to its own staff", async () => {
+    const { f, order } = await packedOrder();
+    await startDelivery(order.id, f.owner);
+    await dispatchOwn(asUser({ ...f.owner, name: "Owner" }), order.id);
+    expect(await db.shipment.findUniqueOrThrow({ where: { orderId: order.id } })).toMatchObject({ mode: "OWN", status: "OUT_FOR_DELIVERY", riderFee: 0 });
+    // A rider can no longer take it.
+    const r = await makeRider();
+    const s = await db.shipment.findUniqueOrThrow({ where: { orderId: order.id } });
+    await expect(acceptJob(asUser(r), s.id)).rejects.toMatchObject({ status: 409 });
   });
 
-  it("de-duplicates repeated webhook deliveries", async () => {
-    const { f, order } = await packedOrder("560034");
-    const r = await createShipmentForOrder(order.id, f.owner);
-    const payload = JSON.stringify({ awb: r.shipment.awbCode, current_status: "PICKED UP", current_status_id: 42, current_timestamp: "10 11 2026 10:00:00" });
-    await handleShiprocketWebhook(payload, null, true);
-    const second = await handleShiprocketWebhook(payload, null, true);
-    expect(second).toMatchObject({ duplicate: true });
-    expect(await statusOf(order.id)).toBe("PICKED_UP");
-    expect(await db.webhookEvent.count({ where: { provider: "SHIPROCKET" } })).toBe(1);
+  it("rider withdrawal: dealer approves, admin pays; declines return the money", async () => {
+    const f = await fixture();
+    const { id: dealerId } = await createDealer(asUser(f.admin), { name: "Dev", email: "d@d.in", phone: "9811100009", password: "Dealer@123", commissionShareBps: 2000, regionIds: [] });
+    const dealer = await db.dealer.findUniqueOrThrow({ where: { id: dealerId } });
+    const dealerUser = asUser({ id: dealer.userId, role: "DEALER", name: "Dev", dealerId });
+    const rider = await makeRider({ dealerId });
+
+    // Earn two prepaid deliveries (no cash collected).
+    for (let i = 0; i < 2; i++) {
+      await addToCart(f.customer.customerId, f.inv1.id, 1, false);
+      const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "COD" });
+      await db.order.update({ where: { id: order.id }, data: { paymentMethod: "UPI", paymentStatus: "CAPTURED" } });
+      for (const to of ["SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING", "PACKED"] as const) await transitionOrder(order.id, to, f.owner);
+      const s = await startDelivery(order.id, f.owner);
+      await acceptJob(asUser(rider), s.id);
+      await pickUp(asUser(rider), s.id);
+      await completeDelivery(asUser(rider), order.id, await codeOf(order.id));
+    }
+    expect(await walletBalance(rider.riderId)).toBe(5000);
+
+    await expect(requestWithdrawal(asUser(rider))).rejects.toThrow(/bank account/i);
+    await saveRiderBank(asUser(rider), zBankInput.parse({ accountHolderName: "Test Rider", accountNumber: "123456789012", ifsc: "SBIN0001234", bankName: "SBI", upiId: "" }));
+    await expect(requestWithdrawal(asUser(rider), 9000)).rejects.toMatchObject({ status: 400 });
+
+    const w = await requestWithdrawal(asUser(rider));
+    expect(w).toMatchObject({ amount: 5000, status: "DEALER_REVIEW", dealerId });
+    expect(await walletBalance(rider.riderId)).toBe(0); // set aside
+    await expect(markWithdrawalPaid(asUser(f.admin), w.id, { reference: "UTR1", payoutMethod: "IMPS" })).rejects.toMatchObject({ status: 409 });
+
+    // Dealer declines → money back; rider re-requests and cancels → money back; then approve + pay.
+    await reviewWithdrawal(dealerUser, w.id, { approve: false, reason: "Bank name mismatch" });
+    expect(await walletBalance(rider.riderId)).toBe(5000);
+    const w2 = await requestWithdrawal(asUser(rider));
+    await cancelWithdrawal(asUser(rider), w2.id);
+    expect(await walletBalance(rider.riderId)).toBe(5000);
+    const w3 = await requestWithdrawal(asUser(rider), 3000);
+    await reviewWithdrawal(dealerUser, w3.id, { approve: true });
+    expect((await db.riderWithdrawal.findUniqueOrThrow({ where: { id: w3.id } })).status).toBe("PENDING");
+    await markWithdrawalPaid(asUser(f.admin), w3.id, { reference: "UTR777", payoutMethod: "UPI" });
+    expect(await db.riderWithdrawal.findUniqueOrThrow({ where: { id: w3.id } })).toMatchObject({ status: "PAID", reference: "UTR777" });
+    expect(await walletBalance(rider.riderId)).toBe(2000);
+    await expect(rejectWithdrawal(asUser(f.admin), w3.id, "late")).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("a rider who collected more cash than they earned cannot withdraw", async () => {
+    const { f, order } = await packedOrder("COD");
+    const rider = await makeRider();
+    const s = await startDelivery(order.id, f.owner);
+    await acceptJob(asUser(rider), s.id);
+    await pickUp(asUser(rider), s.id);
+    await completeDelivery(asUser(rider), order.id, await codeOf(order.id));
+    expect(await walletBalance(rider.riderId)).toBeLessThan(0);
+    await saveRiderBank(asUser(rider), zBankInput.parse({ accountHolderName: "Test Rider", accountNumber: "123456789012", ifsc: "SBIN0001234", bankName: "", upiId: "" }));
+    await expect(requestWithdrawal(asUser(rider))).rejects.toThrow(/owe/);
   });
 });

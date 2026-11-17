@@ -7,7 +7,7 @@ import { safeEqual } from "@/server/auth/password";
 import { expireUnpaidOrders, reconcileRefunds } from "@/server/services/payment";
 import { transitionOrder, SYSTEM } from "@/server/services/order";
 import { getSettings } from "@/server/services/settings";
-import { createShipmentForOrder } from "@/server/services/shipment";
+import { sweepWaitingDeliveries } from "@/server/services/delivery";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  * Periodic maintenance (in-process timer every 5 min while the app is awake — see src/instrumentation.ts — plus an
  * Azure Container Apps job every 6 h as a safety net): expire unpaid orders (after re-checking
  * Cashfree), settle refunds whose webhook was missed, auto-reject orders a shop
- * ignored, reconcile shipments stuck in SHIPMENT_CREATING, and prune old OTPs / idempotency keys.
+ * ignored, re-offer deliveries still waiting for a rider, and prune old OTPs / idempotency keys.
  * Protected by `Authorization: Bearer ${CRON_SECRET}`.
  */
 export async function GET(req: NextRequest) {
@@ -37,18 +37,18 @@ export async function GET(req: NextRequest) {
       }).catch((e) => console.warn("[cron] auto-reject failed", o.id, e));
     }
 
-    const stuck = await db.order.findMany({
-      where: { status: "SHIPMENT_CREATING", shipment: { status: "CREATING", updatedAt: { lt: new Date(Date.now() - 2 * 60_000) } } },
-      select: { id: true },
+    // Re-offer deliveries still waiting for a rider; alert the shop/admins once when nobody accepts in time.
+    const riders = await sweepWaitingDeliveries().catch((e) => {
+      console.warn("[cron] rider sweep failed", e);
+      return { waiting: 0, alerted: 0 };
     });
-    for (const o of stuck) await createShipmentForOrder(o.id, SYSTEM).catch((e) => console.warn("[cron] reconcile failed", o.id, e));
 
     const day = new Date(Date.now() - 86400_000);
     const [otps, keys] = await Promise.all([
       db.otp.deleteMany({ where: { createdAt: { lt: day } } }),
       db.idempotencyKey.deleteMany({ where: { createdAt: { lt: day } } }),
     ]);
-    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, reconciled: stuck.length, prunedOtps: otps.count, prunedKeys: keys.count } });
+    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, waitingForRider: riders.waiting, noRiderAlerts: riders.alerted, prunedOtps: otps.count, prunedKeys: keys.count } });
   } catch (e) {
     return errorResponse(e);
   }

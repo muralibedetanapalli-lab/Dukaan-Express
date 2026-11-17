@@ -31,7 +31,7 @@ flowchart LR
       SET[settings]
     end
     subgraph Adapters["Integration adapters (src/server/integrations)"]
-      SR[Shiprocket<br/>live | mock]
+      LF[Leaflet + OSM tiles<br/>customer live map]
       RZ[Cashfree<br/>live | mock]
       GM[Google Maps<br/>live | haversine]
       FCM[Firebase FCM<br/>live | log]
@@ -42,7 +42,6 @@ flowchart LR
   end
 
   DB[(PostgreSQL<br/>Prisma 7)]
-  EXT1[(Shiprocket API)]
   EXT2[(Cashfree PG API)]
   EXT3[(Google Maps)]
   EXT4[(FCM)]
@@ -71,10 +70,10 @@ flowchart LR
 | Order state | Explicit state machine (`src/server/services/order-state.ts`) with an allow-list of transitions **and** the role allowed to perform each. Every transition writes `OrderStatusHistory` inside the same DB transaction. Optimistic concurrency: updates use `where: { id, status: from }`. |
 | Stock | Reserved atomically at order placement with conditional `UPDATE … WHERE stock >= qty`; released on rejection / cancellation / payment failure. |
 | Multi-shop future | Cart lines carry `shopId`; `Order` has `checkoutGroupId` so one checkout can later fan out into one order per shop. v1 enforces single-shop carts in the cart service. |
-| Shiprocket | Server-only adapter with token caching, timeouts, retries (exponential backoff on 5xx / network). Shipment creation is idempotent: `Shipment` row has unique `orderId` and a deterministic `channelOrderId`; a `SHIPMENT_CREATING` lock is acquired by conditional update before calling Shiprocket, and on retry we first look up the existing Shiprocket order by channel order id before creating a new one. Courier unavailability → `Shipment.status = EXCEPTION`; admin/shop can retry or pick another courier. |
+| Delivery | No third-party courier. `Shipment` is the delivery record (one per order, `mode` OWN or RIDER). Rider jobs are claimed with a conditional update (`riderId IS NULL AND status = CREATED`), so exactly one rider wins. Delivery completes only with the customer's 4-digit handover code. Rider earnings and COD cash are a ledger (`RiderWalletEntry`, unique per order and type); withdrawals set money aside immediately and return it if declined. |
 | Payments | Cashfree order (`/pg/orders`, API 2025-01-01) created server-side when checkout opens; the browser gets only a `payment_session_id` and opens the Cashfree JS SDK modal. Success is never taken from the browser: the server re-reads the order and its payments from Cashfree (amount must match). Webhooks (`PAYMENT_SUCCESS_WEBHOOK`, `PAYMENT_FAILED_WEBHOOK`, `REFUND_STATUS_WEBHOOK`) are verified with `x-webhook-signature` = base64 HMAC-SHA256(timestamp + raw body, secret key). All webhooks are stored in `WebhookEvent` with a unique `(provider, eventId)` for de-duplication. |
 | Real-time | Notifications persisted in DB, pushed over Server-Sent Events from an in-process event bus (with DB polling fallback, so it works across serverless instances), plus FCM push when configured. |
-| Mock adapters | When credentials are absent, each integration resolves to an isolated mock adapter (`*.mock.ts`) and the UI shows a "SANDBOX" badge. Mocks never pretend to be the real provider: shipment IDs are prefixed `MOCK-`. |
+| Mock adapters | When credentials are absent, each integration resolves to an isolated mock adapter (`*.mock.ts`) and the UI shows a "SANDBOX" badge. Mocks never pretend to be the real provider: their ids are prefixed `MOCK-`. |
 
 ## 2. Order lifecycle
 
@@ -91,14 +90,15 @@ stateDiagram-v2
   SHOP_ACCEPTED --> PREPARING: shop
   PREPARING --> READY_FOR_PACKING: shop
   READY_FOR_PACKING --> PACKED: shop "Order Packed"
-  PACKED --> SHIPMENT_CREATING: system (shipment workflow)
-  SHIPMENT_CREATING --> SHIPMENT_CREATED: Shiprocket order + AWB
-  SHIPMENT_CREATING --> PACKED: exception (retry allowed)
-  SHIPMENT_CREATED --> COURIER_ASSIGNED: webhook / AWB assigned
-  COURIER_ASSIGNED --> PICKED_UP: webhook
-  PICKED_UP --> OUT_FOR_DELIVERY: webhook
-  OUT_FOR_DELIVERY --> DELIVERED: webhook
-  OUT_FOR_DELIVERY --> DELIVERY_FAILED: webhook
+  PACKED --> SHIPMENT_CREATED: rider mode (finding a rider)
+  PACKED --> OUT_FOR_DELIVERY: own delivery (shop dispatches)
+  SHIPMENT_CREATED --> COURIER_ASSIGNED: rider accepts
+  SHIPMENT_CREATED --> OUT_FOR_DELIVERY: no rider, shop delivers itself
+  COURIER_ASSIGNED --> SHIPMENT_CREATED: rider gives it back
+  COURIER_ASSIGNED --> PICKED_UP: rider picks up
+  PICKED_UP --> OUT_FOR_DELIVERY: auto
+  OUT_FOR_DELIVERY --> DELIVERED: rider / shop with customer code
+  OUT_FOR_DELIVERY --> DELIVERY_FAILED: rider / shop
   DELIVERY_FAILED --> OUT_FOR_DELIVERY: re-attempt
   SHOP_REJECTED --> REFUND_PENDING: if paid online
   CANCELLED --> REFUND_PENDING: if paid online
@@ -107,37 +107,33 @@ stateDiagram-v2
 ```
 
 Customer-visible timeline groups these into: Order Placed → Payment Confirmed → Shop
-Accepted → Preparing → Ready for Packing → Packed → Shipment Created → Rider Assigned →
+Accepted → Preparing → Ready for Packing → Packed → Rider Assigned →
 Picked Up → Out for Delivery → Delivered.
 
-## 3. Shiprocket shipment workflow
+## 3. Delivery workflow
 
 ```mermaid
 sequenceDiagram
   participant Shop as Shop owner
-  participant API as /api/v1/shop/orders/:id/pack
-  participant OS as OrderService
-  participant SS as ShipmentService
-  participant SR as Shiprocket
-  Shop->>API: Order Packed
-  API->>OS: transition READY_FOR_PACKING→PACKED
-  OS->>SS: createShipment(orderId)
-  SS->>SS: validate pickup address, weight, dims
-  SS->>SS: lock: PACKED→SHIPMENT_CREATING (conditional update)
-  SS->>SR: auth (cached token, 9-day TTL)
-  SS->>SR: GET courier serviceability (pickup pin, delivery pin, weight, cod)
-  alt no courier available
-    SS-->>OS: Shipment EXCEPTION, order back to PACKED
-  else couriers available
-    SS->>SR: lookup existing order by channel_order_id (idempotency)
-    SS->>SR: POST orders/create/adhoc (if not found)
-    SS->>SR: POST courier/assign/awb (best courier by SLA, then cost)
-    SS->>SR: POST courier/generate/pickup
-    SS->>SR: POST courier/generate/label
-    SS-->>OS: SHIPMENT_CREATED (+ COURIER_ASSIGNED)
+  participant DS as DeliveryService
+  participant R as Rider (Dukaan Rider app)
+  participant C as Customer
+  Shop->>DS: Order Packed
+  alt shop delivery mode = RIDER
+    DS->>DS: open delivery (fee by distance, COD amount, 4-digit code)
+    DS-->>R: push alert to online riders near the shop
+    R->>DS: accept (conditional claim — first rider wins)
+    R->>DS: picked up → OUT_FOR_DELIVERY
+    loop every ~15 s while online
+      R->>DS: POST /rider/location
+      C->>DS: GET /orders/:id/track (map)
+    end
+    C-->>R: tells the 4-digit code
+    R->>DS: delivered + code → wallet +fee, −COD cash
+  else shop delivery mode = OWN
+    Shop->>DS: Out for delivery
+    Shop->>DS: delivered + customer code (shop keeps the fee)
   end
-  SR-->>API: webhook /api/v1/webhooks/shiprocket (x-api-key verified)
-  API->>SS: store tracking event, map status → order transition
 ```
 
 ## 4. Folder structure
@@ -168,7 +164,7 @@ sequenceDiagram
 │       ├── db.ts  env.ts  errors.ts  http.ts (apiHandler)  rate-limit.ts
 │       ├── auth/              jwt, session, password, otp
 │       ├── services/          domain logic (one file per bounded context)
-│       ├── integrations/      shiprocket/ cashfree/ maps/ fcm/ sms/ storage/ (live + mock)
+│       ├── integrations/      cashfree/ maps/ fcm/ sms/ storage/ email (live + mock)
 │       ├── realtime/          event bus
 │       └── openapi.ts         OpenAPI 3.1 document
 └── tests/                     vitest unit + integration tests
@@ -184,7 +180,7 @@ sequenceDiagram
 | 4 | Customer app, location-based browsing | ✅ |
 | 5 | Cart, checkout, Cashfree, order creation | ✅ |
 | 6 | Accept / prepare / pack workflow | ✅ |
-| 7 | Shiprocket integration & shipment management | ✅ |
+| 7 | Deliveries: own staff + Dukaan Express riders, live tracking, rider wallet | ✅ |
 | 8 | Notifications, SSE real-time, FCM | ✅ |
 | 9 | Reports, commissions, settlements, refunds, settings | ✅ |
 | 10 | Tests, security hardening, deployment docs | ✅ |

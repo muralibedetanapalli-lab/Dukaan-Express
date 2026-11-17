@@ -3,7 +3,6 @@ import { db } from "@/server/db";
 import type { SessionUser } from "@/server/auth/session";
 import { addToCart } from "@/server/services/cart";
 import { placeOrder, transitionOrder } from "@/server/services/order";
-import { createShipmentForOrder, simulateNextCourierEvent } from "@/server/services/shipment";
 import { markSettlementPaid, requestPayout, saveBankAccount, zBankInput } from "@/server/services/payout";
 import {
   assignShopDealer,
@@ -17,7 +16,7 @@ import {
   updateDealer,
   zDealerShopInput,
 } from "@/server/services/dealer";
-import { fixture, resetDb } from "./helpers";
+import { deliverWithRider, fixture, resetDb } from "./helpers";
 
 type F = Awaited<ReturnType<typeof fixture>>;
 const asUser = (a: Partial<SessionUser> & { id: string; role: string }) => a as unknown as SessionUser;
@@ -27,8 +26,7 @@ async function deliveredOrder(f: F) {
   await addToCart(f.customer.customerId, f.inv1.id, 2, false);
   const order = await placeOrder(f.customer, { addressId: f.customer.addressId, paymentMethod: "COD" });
   for (const to of ["SHOP_ACCEPTED", "PREPARING", "READY_FOR_PACKING", "PACKED"] as const) await transitionOrder(order.id, to, f.owner);
-  await createShipmentForOrder(order.id, f.owner);
-  for (let i = 0; i < 4; i++) await simulateNextCourierEvent(order.id);
+  await deliverWithRider(order.id, f.owner);
   return order;
 }
 

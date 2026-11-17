@@ -26,7 +26,7 @@ export function RealtimeListener({ onNotification, refreshOnUpdate = true, sound
           description: n.body,
           action: n.data?.link ? { label: "View", onClick: () => router.push(n.data!.link!) } : undefined,
         });
-        if (sound && n.type === "ORDER_NEW") chime();
+        if (sound && (n.type === "ORDER_NEW" || n.type === "DELIVERY_JOB")) chime();
         onNotification?.();
       } catch {}
       refresh();

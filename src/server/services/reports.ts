@@ -171,7 +171,10 @@ export async function buildReport(type: ReportType, from: Date, to: Date, shopId
     case "delivery": {
       const rows = await db.shipment.findMany({
         where: { createdAt: range, ...(shopId ? { order: { shopId } } : {}) },
-        include: { order: { select: { orderNumber: true, deliveredAt: true, packedAt: true, shop: { select: { name: true } } } } },
+        include: {
+          order: { select: { orderNumber: true, deliveredAt: true, packedAt: true, shop: { select: { name: true } } } },
+          rider: { select: { user: { select: { name: true } } } },
+        },
         orderBy: { createdAt: "asc" },
       });
       return {
@@ -179,24 +182,24 @@ export async function buildReport(type: ReportType, from: Date, to: Date, shopId
         columns: [
           { key: "order", label: "Order" },
           { key: "shop", label: "Shop" },
-          { key: "awb", label: "AWB" },
-          { key: "courier", label: "Courier" },
+          { key: "mode", label: "Delivered by" },
+          { key: "rider", label: "Rider" },
           { key: "status", label: "Status" },
-          { key: "attempts", label: "Creation attempts" },
+          { key: "attempts", label: "Riders assigned" },
           { key: "failed", label: "Failed deliveries" },
           { key: "minutes", label: "Packed → delivered (min)" },
-          { key: "freight", label: "Freight (₹)", money: true },
+          { key: "riderFee", label: "Rider fee (₹)", money: true },
         ],
         rows: rows.map((s) => ({
           order: s.order.orderNumber,
           shop: s.order.shop.name,
-          awb: s.awbCode,
-          courier: s.courierName,
+          mode: s.mode === "OWN" ? "Shop" : "Rider",
+          rider: s.rider?.user.name ?? null,
           status: s.status,
           attempts: s.attempts,
           failed: s.failedDeliveryCount,
           minutes: s.order.deliveredAt && s.order.packedAt ? Math.round((s.order.deliveredAt.getTime() - s.order.packedAt.getTime()) / 60000) : null,
-          freight: s.freightCharge ?? 0,
+          riderFee: s.riderFee,
         })),
       };
     }

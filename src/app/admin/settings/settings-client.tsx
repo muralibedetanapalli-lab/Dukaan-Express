@@ -57,14 +57,14 @@ const GROUPS: { key: string; label: string; fields: Field[] }[] = [
     key: "delivery",
     label: "Delivery",
     fields: [
-      { key: "baseFee", label: "Base delivery fee (₹, first 2 km)", kind: "money" },
+      { key: "baseFee", label: "Base delivery fee (₹, first 2 km) — riders earn the full fee", kind: "money" },
       { key: "perKmFee", label: "Per extra km (₹)", kind: "money" },
       { key: "freeDeliveryThreshold", label: "Free delivery above (₹)", kind: "money" },
       { key: "maxRadiusKm", label: "Platform max delivery radius (km)", kind: "float" },
       { key: "avgSpeedKmph", label: "Average rider speed (km/h) for ETA", kind: "float" },
       { key: "handoverBufferMinutes", label: "Handover buffer (min)", kind: "int" },
-      { key: "courierStrategy", label: "Courier auto-selection", kind: "select", options: ["FASTEST", "CHEAPEST", "RECOMMENDED"] },
-      { key: "autoSchedulePickup", label: "Schedule Shiprocket pickup automatically", kind: "bool" },
+      { key: "riderSearchRadiusKm", label: "Offer jobs to riders within (km of the shop)", kind: "float" },
+      { key: "riderSearchTimeoutMinutes", label: "Alert if no rider accepts within (min)", kind: "int" },
     ],
   },
   {
@@ -186,7 +186,7 @@ export function SettingsClient({ settings, integrations, areas }: { settings: Se
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">Webhook URLs: /api/v1/webhooks/cashfree · /api/v1/webhooks/shiprocket (alias /api/v1/webhooks/courier)</p>
+          <p className="text-xs text-muted-foreground">Webhook URL: /api/v1/webhooks/cashfree</p>
         </Card>
       </TabsContent>
     </Tabs>

@@ -3,9 +3,9 @@ import { api } from "@/server/http";
 import { ORDER_STATUSES } from "@/lib/order-status";
 import { adminCancel, transitionOrder } from "@/server/services/order";
 import { initiateRefund } from "@/server/services/payment";
-import { cancelShipment, courierOptions, createShipmentForOrder, refreshTracking, simulateNextCourierEvent } from "@/server/services/shipment";
+import { adminAssignRider, completeDelivery, dispatchOwn, failDelivery, startDelivery } from "@/server/services/delivery";
 
-/** Admin order operations: override transitions, cancel, refund, and shipment management. */
+/** Admin order operations: override transitions, cancel, refund, and delivery management. */
 export const POST = api(
   {
     roles: ["SUPER_ADMIN"],
@@ -13,11 +13,11 @@ export const POST = api(
       z.object({ action: z.literal("transition"), to: z.enum(ORDER_STATUSES), remarks: z.string().trim().min(3).max(300) }),
       z.object({ action: z.literal("cancel"), reason: z.string().trim().min(3).max(300) }),
       z.object({ action: z.literal("refund"), amount: z.number().int().min(1), reason: z.string().trim().min(3).max(300) }),
-      z.object({ action: z.literal("shipment_create"), courierCompanyId: z.number().int().optional() }),
-      z.object({ action: z.literal("shipment_cancel") }),
-      z.object({ action: z.literal("shipment_refresh") }),
-      z.object({ action: z.literal("shipment_couriers") }),
-      z.object({ action: z.literal("simulate_courier") }),
+      z.object({ action: z.literal("delivery_start") }),
+      z.object({ action: z.literal("assign_rider"), riderId: z.string().min(1) }),
+      z.object({ action: z.literal("deliver_own") }),
+      z.object({ action: z.literal("delivery_complete"), code: z.string().trim().regex(/^\d{4}$/, "Enter the 4-digit code") }),
+      z.object({ action: z.literal("delivery_failed"), reason: z.string().trim().min(3).max(300) }),
     ]),
   },
   async ({ user, params, body }) => {
@@ -29,17 +29,20 @@ export const POST = api(
         return adminCancel(params.id, actor, body.reason);
       case "refund":
         return initiateRefund(params.id, { amount: body.amount, reason: body.reason, actor });
-      case "shipment_create":
-        return createShipmentForOrder(params.id, actor, { courierCompanyId: body.courierCompanyId });
-      case "shipment_cancel":
-        await cancelShipment(params.id, actor);
+      case "delivery_start":
+        return startDelivery(params.id, actor);
+      case "assign_rider":
+        await adminAssignRider(user, params.id, body.riderId);
         return { ok: true };
-      case "shipment_refresh":
-        return refreshTracking(params.id);
-      case "shipment_couriers":
-        return { couriers: await courierOptions(params.id) };
-      case "simulate_courier":
-        return simulateNextCourierEvent(params.id);
+      case "deliver_own":
+        await dispatchOwn(user, params.id);
+        return { ok: true };
+      case "delivery_complete":
+        await completeDelivery(user, params.id, body.code);
+        return { ok: true };
+      case "delivery_failed":
+        await failDelivery(user, params.id, body.reason);
+        return { ok: true };
     }
   },
 );

@@ -18,12 +18,6 @@ const schema = z.object({
   CASHFREE_SECRET_KEY: blank,
   CASHFREE_ENV: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.enum(["sandbox", "production"]).default("sandbox")),
 
-  SHIPROCKET_EMAIL: blank,
-  SHIPROCKET_PASSWORD: blank,
-  SHIPROCKET_BASE_URL: z.string().default("https://apiv2.shiprocket.in/v1/external"),
-  SHIPROCKET_WEBHOOK_TOKEN: blank,
-  SHIPROCKET_CHANNEL_ID: blank,
-
   GOOGLE_MAPS_API_KEY: blank,
 
   FCM_PROJECT_ID: blank,
@@ -68,7 +62,6 @@ export function integrationModes() {
   const e = env();
   return {
     cashfree: e.CASHFREE_APP_ID && e.CASHFREE_SECRET_KEY ? "live" : "mock",
-    shiprocket: e.SHIPROCKET_EMAIL && e.SHIPROCKET_PASSWORD ? "live" : "mock",
     maps: e.GOOGLE_MAPS_API_KEY ? "live" : "mock",
     fcm: e.FCM_PROJECT_ID && e.FCM_CLIENT_EMAIL && e.FCM_PRIVATE_KEY ? "live" : "mock",
     sms: e.SMS_PROVIDER && e.SMS_API_KEY ? "live" : "mock",

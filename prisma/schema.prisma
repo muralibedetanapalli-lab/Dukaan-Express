@@ -17,6 +17,7 @@ enum UserRole {
   SHOP_OWNER
   CUSTOMER
   DEALER
+  RIDER
 }
 
 enum UserStatus {
@@ -84,6 +85,20 @@ enum ShipmentStatus {
   EXCEPTION
 }
 
+/// How a shop's orders reach customers.
+enum DeliveryMode {
+  OWN // the shop's own staff delivers; the shop keeps the delivery fee
+  RIDER // a Dukaan Express rider picks up and delivers; the rider earns the delivery fee
+}
+
+enum WalletEntryType {
+  DELIVERY_EARNING // + delivery fee for a completed delivery
+  COD_COLLECTED // − cash the rider collected from a cash-on-delivery customer (rider keeps it)
+  WITHDRAWAL // − money set aside for a withdrawal request
+  WITHDRAWAL_REVERSAL // + returned when a withdrawal is declined or cancelled
+  ADJUSTMENT // ± manual correction by the admin
+}
+
 enum RefundStatus {
   PENDING
   PROCESSING
@@ -145,6 +160,7 @@ model User {
   customer      Customer?
   shopOwner     ShopOwner?
   dealer        Dealer?
+  rider         Rider?
   notifications Notification[]
   deviceTokens  DeviceToken[]
   auditLogs     AuditLog[]
@@ -218,34 +234,34 @@ model DeviceToken {
 // ───────────────────────────── Shops ─────────────────────────────
 
 model Shop {
-  id                 String         @id @default(cuid())
-  name               String
-  slug               String         @unique
-  description        String?
-  ownerId            String?
-  owner              ShopOwner?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  categoryId         String?
-  category           Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  contactPhone       String
-  contactEmail       String?
-  gstNumber          String?
-  logoUrl            String?
-  coverUrl           String?
-  approvalStatus     ApprovalStatus @default(PENDING)
-  rejectionReason    String?
-  isActive           Boolean        @default(false)
-  acceptingOrders    Boolean        @default(true)
-  deliveryRadiusKm   Float          @default(5)
-  commissionBps      Int? // null → platform default
-  avgPrepMinutes     Int            @default(10)
-  rating             Float          @default(0)
-  ratingCount        Int            @default(0)
-  pickupLocationName String? // pickup nickname registered with Shiprocket
-  dealerId           String? // regional dealer who onboarded / manages this shop
-  dealer             Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  deletedAt          DateTime?
+  id               String         @id @default(cuid())
+  name             String
+  slug             String         @unique
+  description      String?
+  ownerId          String?
+  owner            ShopOwner?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  contactPhone     String
+  contactEmail     String?
+  gstNumber        String?
+  logoUrl          String?
+  coverUrl         String?
+  approvalStatus   ApprovalStatus @default(PENDING)
+  rejectionReason  String?
+  isActive         Boolean        @default(false)
+  acceptingOrders  Boolean        @default(true)
+  deliveryRadiusKm Float          @default(5)
+  commissionBps    Int? // null → platform default
+  avgPrepMinutes   Int            @default(10)
+  rating           Float          @default(0)
+  ratingCount      Int            @default(0)
+  deliveryMode     DeliveryMode   @default(RIDER)
+  dealerId         String? // regional dealer who onboarded / manages this shop
+  dealer           Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
 
   address     ShopAddress?
   hours       ShopOperatingHours[]
@@ -691,50 +707,36 @@ model Refund {
 
 // ───────────────────────────── Delivery ─────────────────────────────
 
-model DeliveryPartner {
-  id                  String   @id @default(cuid())
-  name                String
-  shiprocketCourierId Int?     @unique
-  phone               String?
-  isActive            Boolean  @default(true)
-  createdAt           DateTime @default(now())
-
-  shipments Shipment[]
-}
-
+/// One delivery per order: by the shop's own staff (OWN) or a Dukaan Express rider (RIDER).
+/// status: CREATED = looking for a rider, COURIER_ASSIGNED = rider accepted, OUT_FOR_DELIVERY, DELIVERED,
+/// FAILED_ATTEMPT, CANCELLED. PENDING = own delivery not yet dispatched.
 model Shipment {
-  id                   String           @id @default(cuid())
-  orderId              String           @unique
-  order                Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider             String // SHIPROCKET | SHIPROCKET_MOCK
-  channelOrderId       String           @unique // idempotency key sent to Shiprocket
-  status               ShipmentStatus   @default(PENDING)
-  shiprocketOrderId    String?
-  shiprocketShipmentId String?
-  awbCode              String?          @unique
-  courierCompanyId     Int?
-  courierName          String?
-  deliveryPartnerId    String?
-  deliveryPartner      DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id], onDelete: SetNull)
-  riderName            String?
-  riderPhone           String?
-  freightCharge        Int?
-  etd                  String?
-  labelUrl             String?
-  manifestUrl          String?
-  trackingUrl          String?
-  pickupScheduledAt    DateTime?
-  pickupToken          String?
-  attempts             Int              @default(0)
-  failedDeliveryCount  Int              @default(0)
-  lastError            String?
-  lastErrorAt          DateTime?
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                  String         @id @default(cuid())
+  orderId             String         @unique
+  order               Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mode                DeliveryMode   @default(RIDER)
+  status              ShipmentStatus @default(PENDING)
+  riderId             String?
+  rider               Rider?         @relation(fields: [riderId], references: [id], onDelete: SetNull)
+  riderFee            Int            @default(0) // what the rider earns for this delivery (paise)
+  codAmount           Int            @default(0) // cash to collect from the customer (paise)
+  deliveryCode        String         @default("") // 4-digit handover code the customer tells the rider
+  searchStartedAt     DateTime?
+  noRiderAlertedAt    DateTime?
+  assignedAt          DateTime?
+  pickedUpAt          DateTime?
+  deliveredAt         DateTime?
+  attempts            Int            @default(0) // how many riders accepted it (re-assignments)
+  failedDeliveryCount Int            @default(0)
+  lastError           String?
+  lastErrorAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   events ShipmentTrackingEvent[]
 
-  @@index([status])
+  @@index([status, riderId])
+  @@index([riderId, status])
 }
 
 model ShipmentTrackingEvent {
@@ -982,6 +984,7 @@ model Dealer {
 
   regions     ServiceArea[]
   shops       Shop[]
+  riders      Rider[]
   commissions Commission[]
   payouts     DealerPayout[]
   bankAccount DealerBankAccount?
@@ -1016,6 +1019,90 @@ model DealerBankAccount {
   id                String   @id @default(cuid())
   dealerId          String   @unique
   dealer            Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  accountHolderName String
+  accountNumberEnc  String
+  accountLast4      String
+  ifsc              String
+  bankName          String?
+  upiId             String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ───────────────────────────── Riders ─────────────────────────────
+
+/// Delivery rider, onboarded by a regional dealer. Works in the Dukaan Rider app.
+model Rider {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealerId      String?
+  dealer        Dealer?   @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  vehicleType   String? // BIKE | SCOOTER | CYCLE | OTHER
+  vehicleNumber String?
+  isOnline      Boolean   @default(false)
+  lat           Float?
+  lng           Float?
+  locationAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  deliveries  Shipment[]
+  wallet      RiderWalletEntry[]
+  withdrawals RiderWithdrawal[]
+  bankAccount RiderBankAccount?
+
+  @@index([isOnline])
+  @@index([dealerId])
+}
+
+/// Rider wallet ledger. Balance = sum(amount). Each delivery adds its fee once (unique per order and type).
+model RiderWalletEntry {
+  id           String          @id @default(cuid())
+  riderId      String
+  rider        Rider           @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  type         WalletEntryType
+  amount       Int // signed, paise
+  orderId      String?
+  withdrawalId String?
+  note         String?
+  createdAt    DateTime        @default(now())
+
+  @@unique([orderId, type])
+  @@index([riderId, createdAt])
+}
+
+/// Rider asks to withdraw wallet money: dealer approves (DEALER_REVIEW → PENDING), admin transfers (PAID).
+model RiderWithdrawal {
+  id                 String           @id @default(cuid())
+  riderId            String
+  rider              Rider            @relation(fields: [riderId], references: [id])
+  amount             Int
+  status             SettlementStatus @default(DEALER_REVIEW)
+  bankSnapshot       Json?
+  dealerId           String?
+  dealerReviewedAt   DateTime?
+  dealerReviewedById String?
+  dealerNote         String?
+  reference          String?
+  payoutMethod       String?
+  proofUrl           String?
+  notes              String?
+  rejectionReason    String?
+  paidAt             DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([riderId, status])
+  @@index([dealerId, status])
+}
+
+/// Where a rider wants withdrawals sent. The account number is AES-256-GCM encrypted at rest.
+model RiderBankAccount {
+  id                String   @id @default(cuid())
+  riderId           String   @unique
+  rider             Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
   accountHolderName String
   accountNumberEnc  String
   accountLast4      String

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Bike, ExternalLink, MapPin, PartyPopper, Phone, Store, Truck } from "lucide-react";
+import { MapPin, PartyPopper, Phone, Store } from "lucide-react";
 import { getSessionUser } from "@/server/auth/session";
 import { AppError } from "@/server/errors";
 import { getOrderForActor } from "@/server/services/order";
 import { getSettings } from "@/server/services/settings";
+import { trackingFor } from "@/server/services/delivery";
+import { LiveTracking } from "@/components/customer/live-tracking";
 import { Card } from "@/components/ui/card";
 import { OrderStatusBadge, PaymentBadge, Pill } from "@/components/shared/status-badge";
 import { OrderTimeline } from "@/components/shared/order-timeline";
@@ -30,7 +32,7 @@ export default async function OrderDetailPage({ params, searchParams }: { params
   }
   const settings = await getSettings();
   const addr = order.addressSnapshot as Record<string, string | null>;
-  const s = order.shipment;
+  const tracking = order.shipment ? await trackingFor(order) : null;
   const cancellable = settings.cancellation.customerCancellableStatuses.includes(order.status);
 
   return (
@@ -77,49 +79,7 @@ export default async function OrderDetailPage({ params, searchParams }: { params
             <OrderTimeline status={order.status} history={order.statusHistory} paymentMethod={order.paymentMethod} />
           </Card>
 
-          {s && s.status !== "CANCELLED" && (
-            <Card className="gap-3 p-5">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-2 font-semibold">
-                  <Truck className="size-5 text-primary" /> Delivery tracking
-                </p>
-                {s.provider === "SHIPROCKET_MOCK" && <Pill tone="warning">Sandbox courier</Pill>}
-              </div>
-              <div className="grid gap-1 text-sm sm:grid-cols-2">
-                {s.courierName && <p>Courier: <b>{s.courierName}</b></p>}
-                {s.awbCode && <p>AWB: <span className="font-mono">{s.awbCode}</span></p>}
-                {s.riderName && (
-                  <p className="flex items-center gap-1">
-                    <Bike className="size-4" /> {s.riderName}
-                    {s.riderPhone && (
-                      <a href={`tel:${s.riderPhone}`} className="ml-1 inline-flex items-center gap-0.5 text-primary">
-                        <Phone className="size-3.5" /> Call
-                      </a>
-                    )}
-                  </p>
-                )}
-                {s.etd && <p>ETA: {s.etd}</p>}
-              </div>
-              {s.trackingUrl && (
-                <a href={s.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                  Live tracking <ExternalLink className="size-3.5" />
-                </a>
-              )}
-              {s.events.length > 0 && (
-                <ul className="space-y-2 border-l-2 pl-4 text-sm">
-                  {s.events.filter((e) => e.source !== "SYSTEM" || ["COURIER_ASSIGNED", "PICKUP_SCHEDULED"].includes(e.status)).map((e) => (
-                    <li key={e.id}>
-                      <p className="font-medium">{e.description ?? e.status}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {fmtDateTime(e.occurredAt)}
-                        {e.location ? ` · ${e.location}` : ""}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
+          {tracking && <LiveTracking orderId={order.id} initialStatus={order.status} initial={tracking} />}
 
           <Card className="gap-0 p-0">
             <p className="border-b px-5 py-3 font-semibold">Items ({order.items.length})</p>

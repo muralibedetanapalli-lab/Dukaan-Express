@@ -486,7 +486,19 @@ async function main() {
   // Historical orders for analytics (delivered / cancelled), computed with the real pricing engine
   console.log("Creating order history…");
   const statuses: OrderStatus[] = ["DELIVERED", "DELIVERED", "DELIVERED", "DELIVERED", "DELIVERED", "DELIVERED", "CANCELLED", "SHOP_REJECTED"];
-  const partner = await db.deliveryPartner.create({ data: { name: "Mock Hyperlocal Express (bike)", shiprocketCourierId: 901 } });
+  // Demo rider (assigned to the Bengaluru dealer further down) who delivered the history orders.
+  const riderUser = await db.user.create({
+    data: {
+      role: "RIDER",
+      name: "Raju Naik",
+      email: "rider@dukaanexpress.in",
+      phone: "9000000020",
+      passwordHash: await bcrypt.hash("Rider@12345", 12),
+      rider: { create: { vehicleType: "BIKE", vehicleNumber: "KA01EX1234", lat: 12.9352, lng: 77.6245, locationAt: new Date() } },
+    },
+    include: { rider: true },
+  });
+  const riderId = riderUser.rider!.id;
   let seq = 0;
   for (let day = 29; day >= 1; day--) {
     const perDay = 1 + (day % 3);
@@ -594,27 +606,28 @@ async function main() {
         await db.shipment.create({
           data: {
             orderId: order.id,
-            provider: "SHIPROCKET_MOCK",
-            channelOrderId: order.orderNumber,
+            mode: "RIDER",
             status: "DELIVERED",
-            shiprocketOrderId: `MOCK-ORD-SEED${seq}`,
-            shiprocketShipmentId: `MOCK-SHP-SEED${seq}`,
-            awbCode: `MOCKAWBSEED${String(seq).padStart(5, "0")}`,
-            courierCompanyId: 901,
-            courierName: partner.name,
-            deliveryPartnerId: partner.id,
-            freightCharge: 3500,
+            riderId,
+            riderFee: 3500,
+            codAmount: cod ? q.total : 0,
+            deliveryCode: String(1000 + (seq % 9000)),
             attempts: 1,
+            assignedAt: order.packedAt!,
+            pickedUpAt: new Date(order.packedAt!.getTime() + 6 * 60_000),
+            deliveredAt: order.deliveredAt!,
             createdAt: order.packedAt!,
             events: {
               create: [
-                { status: "COURIER_ASSIGNED", description: "AWB assigned", source: "SYSTEM", occurredAt: order.packedAt! },
-                { status: "PICKED_UP", description: "Picked up", source: "WEBHOOK", occurredAt: new Date(order.packedAt!.getTime() + 6 * 60_000) },
-                { status: "DELIVERED", description: "Delivered", source: "WEBHOOK", occurredAt: order.deliveredAt! },
+                { status: "COURIER_ASSIGNED", description: "Accepted by Raju Naik", source: "SYSTEM", occurredAt: order.packedAt! },
+                { status: "OUT_FOR_DELIVERY", description: "Picked up — on the way to the customer", source: "SYSTEM", occurredAt: new Date(order.packedAt!.getTime() + 6 * 60_000) },
+                { status: "DELIVERED", description: "Delivered — handover code verified", source: "SYSTEM", occurredAt: order.deliveredAt! },
               ],
             },
           },
         });
+        await db.riderWalletEntry.create({ data: { riderId, type: "DELIVERY_EARNING", amount: 3500, orderId: order.id, note: `Delivery ${order.orderNumber}`, createdAt: order.deliveredAt! } });
+        if (cod) await db.riderWalletEntry.create({ data: { riderId, type: "COD_COLLECTED", amount: -q.total, orderId: order.id, note: `Cash collected · ${order.orderNumber}`, createdAt: order.deliveredAt! } });
       } else if (!cod) {
         const pay = await db.payment.findFirstOrThrow({ where: { orderId: order.id } });
         await db.refund.create({ data: { orderId: order.id, paymentId: pay.id, amount: q.total, reason: "Order cancelled", status: "PROCESSED", providerRefundId: `rfnd_MOCKSEED${seq}`, processedAt: order.cancelledAt } });
@@ -658,6 +671,9 @@ async function main() {
   const dealerShops = [shopRows[1].id, shopRows[2].id];
   await db.serviceArea.update({ where: { id: blr.id }, data: { dealerId } });
   await db.shop.updateMany({ where: { id: { in: dealerShops } }, data: { dealerId } });
+  await db.rider.update({ where: { id: riderId }, data: { dealerId } });
+  // One shop delivers with its own staff, to show both delivery modes.
+  await db.shop.update({ where: { id: shopRows[2].id }, data: { deliveryMode: "OWN" } });
   await db.$executeRaw`UPDATE "Commission" SET "dealerId" = ${dealerId}, "dealerAmount" = ROUND(amount * 0.2) WHERE "shopId" = ANY(${dealerShops})`;
 
   console.log(`✔ ${PRODUCTS.length} products, ${SHOPS.length} shops, ${seq} historical orders`);
@@ -665,6 +681,7 @@ async function main() {
   console.log("  Shop owner: ravi@dukaanexpress.in / Owner@12345 (FreshMart + Sri Ganesh)");
   console.log("  Customer: priya@example.com (or 9876543210) / Customer@123");
   console.log("  Dealer: dealer@dukaanexpress.in / Dealer@12345 (Bengaluru; Green Basket + 1 more)");
+  console.log("  Rider: rider@dukaanexpress.in / Rider@12345 (Bengaluru, dealer Deepak Rao)");
 }
 
 main()

@@ -7,9 +7,13 @@ const BOLT = `<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>`;
 // lucide "store" icon
 const STORE = `<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/>`;
 
+// lucide "bike" icon
+const BIKE = `<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>`;
+
 const APPS = [
   { dir: "customer", glyph: BOLT, from: "#22c55e", to: "#15803d", dark: "#0f3d24", fill: true },
   { dir: "shop", glyph: STORE, from: "#15803d", to: "#0f3d24", dark: "#08241a", fill: false },
+  { dir: "rider", glyph: BIKE, from: "#f59e0b", to: "#b45309", dark: "#78350f", fill: false },
 ];
 
 // glyph drawn in a 24x24 box, scaled to `size` and centred in a `canvas` square

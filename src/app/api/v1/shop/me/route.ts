@@ -13,7 +13,7 @@ export const GET = api({ roles: ["SHOP_OWNER"] }, async ({ user }) => {
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
-/** Owners can toggle order intake, switch active shop, and edit operating hours / prep time. */
+/** Owners can toggle order intake, switch active shop, edit operating hours / prep time and choose the delivery mode. */
 export const PATCH = api(
   {
     roles: ["SHOP_OWNER"],
@@ -21,6 +21,7 @@ export const PATCH = api(
       switchToShopId: z.string().optional(),
       acceptingOrders: z.boolean().optional(),
       avgPrepMinutes: z.number().int().min(1).max(120).optional(),
+      deliveryMode: z.enum(["OWN", "RIDER"]).optional(),
       hours: z
         .array(z.object({ dayOfWeek: z.number().int().min(0).max(6), openTime: hhmm, closeTime: hhmm, isClosed: z.boolean() }))
         .max(7)
@@ -37,7 +38,7 @@ export const PATCH = api(
     const { shop } = await activeShopFor(user);
     await db.shop.update({
       where: { id: shop.id },
-      data: { acceptingOrders: body.acceptingOrders, avgPrepMinutes: body.avgPrepMinutes },
+      data: { acceptingOrders: body.acceptingOrders, avgPrepMinutes: body.avgPrepMinutes, deliveryMode: body.deliveryMode },
     });
     for (const h of body.hours ?? []) {
       await db.shopOperatingHours.upsert({

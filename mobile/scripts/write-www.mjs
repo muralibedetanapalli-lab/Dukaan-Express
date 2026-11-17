@@ -4,11 +4,17 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const DEFAULT_SERVER = "https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io";
-const role = path.basename(process.cwd()); // customer | shop
+const role = path.basename(process.cwd()); // customer | shop | rider
 const server = (process.env.DUKAAN_URL ?? DEFAULT_SERVER).replace(/\/$/, "");
-const start = `${server}${role === "shop" ? "/shop" : "/"}`;
-const color = role === "shop" ? "#0f3d24" : "#15803d";
-const name = role === "shop" ? "Dukaan Partner" : "Dukaan Express";
+const APPS = {
+  customer: { path: "/", color: "#15803d", name: "Dukaan Express" },
+  shop: { path: "/shop", color: "#0f3d24", name: "Dukaan Partner" },
+  rider: { path: "/rider", color: "#b45309", name: "Dukaan Rider" },
+};
+const app = APPS[role] ?? APPS.customer;
+const start = `${server}${app.path}`;
+const color = app.color;
+const name = app.name;
 
 const page = (body) => `<!doctype html>
 <html lang="en">

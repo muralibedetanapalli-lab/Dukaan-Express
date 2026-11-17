@@ -10,6 +10,7 @@ const RULES: { prefix: string; roles: Role[]; login: string }[] = [
   { prefix: "/admin", roles: ["SUPER_ADMIN"], login: "/login/staff" },
   { prefix: "/shop", roles: ["SHOP_OWNER"], login: "/login/staff" },
   { prefix: "/dealer", roles: ["DEALER"], login: "/login/staff" },
+  { prefix: "/rider", roles: ["RIDER"], login: "/login/staff" },
   { prefix: "/checkout", roles: ["CUSTOMER"], login: "/login" },
   { prefix: "/orders", roles: ["CUSTOMER"], login: "/login" },
   { prefix: "/account", roles: ["CUSTOMER"], login: "/login" },

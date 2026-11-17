@@ -34,9 +34,9 @@ export const STATUS_META: Record<OrderStatusKey, { label: string; tone: Tone }> 
   PREPARING: { label: "Preparing", tone: "info" },
   READY_FOR_PACKING: { label: "Ready for packing", tone: "info" },
   PACKED: { label: "Packed", tone: "primary" },
-  SHIPMENT_CREATING: { label: "Creating shipment", tone: "primary" },
-  SHIPMENT_CREATED: { label: "Awaiting pickup", tone: "primary" },
-  COURIER_ASSIGNED: { label: "Rider assigned", tone: "primary" },
+  SHIPMENT_CREATING: { label: "Arranging delivery", tone: "primary" },
+  SHIPMENT_CREATED: { label: "Finding a rider", tone: "primary" },
+  COURIER_ASSIGNED: { label: "Rider on the way to shop", tone: "primary" },
   PICKED_UP: { label: "Picked up", tone: "primary" },
   OUT_FOR_DELIVERY: { label: "Out for delivery", tone: "primary" },
   DELIVERED: { label: "Delivered", tone: "success" },
@@ -53,8 +53,7 @@ export const CUSTOMER_TIMELINE: { key: string; label: string; statuses: OrderSta
   { key: "accepted", label: "Shop accepted", statuses: ["SHOP_ACCEPTED"] },
   { key: "preparing", label: "Preparing order", statuses: ["PREPARING"] },
   { key: "ready", label: "Ready for packing", statuses: ["READY_FOR_PACKING"] },
-  { key: "packed", label: "Order packed", statuses: ["PACKED", "SHIPMENT_CREATING"] },
-  { key: "shipment", label: "Shipment created", statuses: ["SHIPMENT_CREATED"] },
+  { key: "packed", label: "Order packed", statuses: ["PACKED", "SHIPMENT_CREATING", "SHIPMENT_CREATED"] },
   { key: "rider", label: "Rider assigned", statuses: ["COURIER_ASSIGNED"] },
   { key: "picked", label: "Picked up", statuses: ["PICKED_UP"] },
   { key: "ofd", label: "Out for delivery", statuses: ["OUT_FOR_DELIVERY"] },
@@ -74,18 +73,16 @@ export const ACTIVE_SHOP_STATUSES: OrderStatusKey[] = [
   "COURIER_ASSIGNED",
 ];
 
+/** Delivery (Shipment) statuses as shown to people. */
 export const SHIPMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending",
-  CREATING: "Creating",
-  CREATED: "Created",
-  COURIER_ASSIGNED: "Courier assigned",
-  PICKUP_SCHEDULED: "Pickup scheduled",
+  PENDING: "Not dispatched",
+  CREATED: "Finding a rider",
+  COURIER_ASSIGNED: "Rider assigned",
   PICKED_UP: "Picked up",
-  IN_TRANSIT: "In transit",
   OUT_FOR_DELIVERY: "Out for delivery",
   DELIVERED: "Delivered",
-  FAILED_ATTEMPT: "Failed attempt",
-  RTO: "Returned to origin",
+  FAILED_ATTEMPT: "Delivery failed",
   CANCELLED: "Cancelled",
-  EXCEPTION: "Exception",
 };
+
+export const DELIVERY_MODE_LABEL: Record<string, string> = { OWN: "Shop's own delivery", RIDER: "Dukaan Express rider" };

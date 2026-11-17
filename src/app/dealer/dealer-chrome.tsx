@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BadgeCheck, Handshake, IndianRupee, LayoutDashboard, LogOut, Store } from "lucide-react";
+import { BadgeCheck, Bike, Handshake, IndianRupee, LayoutDashboard, LogOut, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "@/components/shared/notification-bell";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/dealer", label: "Home", icon: LayoutDashboard },
   { href: "/dealer/shops", label: "Shops", icon: Store },
+  { href: "/dealer/riders", label: "Riders", icon: Bike },
   { href: "/dealer/payouts", label: "Payout approvals", short: "Approvals", icon: BadgeCheck },
   { href: "/dealer/earnings", label: "My earnings", short: "Earnings", icon: IndianRupee },
 ];
@@ -69,7 +70,7 @@ export function DealerChrome({ name, regions, pending, children }: { name: strin
       </header>
       <main className="mx-auto max-w-5xl px-4 pt-4 pb-24 md:pb-10">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
-        <ul className="grid grid-cols-4">
+        <ul className="grid grid-cols-5">
           {NAV.map((n) => (
             <li key={n.href}>
               <Link href={n.href} className={cn("relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold", isActive(n.href) ? "text-primary" : "text-muted-foreground")}>

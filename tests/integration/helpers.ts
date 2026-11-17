@@ -77,3 +77,31 @@ export async function fixture(opts: { deliveryPincode?: string; stock?: number }
     admin: { id: admin.id, role: "SUPER_ADMIN" as const },
   };
 }
+
+/** An online rider standing at the fixture shop, as a session user. */
+export async function makeRider(opts: { phone?: string; dealerId?: string | null } = {}) {
+  const u = await db.user.create({
+    data: {
+      role: "RIDER",
+      name: "Test Rider",
+      email: `rider-${Math.random().toString(36).slice(2, 8)}@t.in`,
+      phone: opts.phone ?? `98${Math.floor(10_000_000 + Math.random() * 89_999_999)}`,
+      passwordHash: "x",
+      rider: { create: { isOnline: true, lat: 12.935, lng: 77.6245, locationAt: new Date(), dealerId: opts.dealerId ?? null } },
+    },
+    include: { rider: true },
+  });
+  return { id: u.id, role: "RIDER" as const, name: u.name, email: u.email, phone: u.phone, customerId: null, shopOwnerId: null, dealerId: null, riderId: u.rider!.id };
+}
+
+/** Drive a PACKED order through rider delivery: dispatch → accept → pick up → deliver with the customer code. */
+export async function deliverWithRider(orderId: string, owner: { id: string; role: "SHOP_OWNER"; shopOwnerId: string }, rider?: Awaited<ReturnType<typeof makeRider>>) {
+  const { startDelivery, acceptJob, pickUp, completeDelivery } = await import("@/server/services/delivery");
+  const r = rider ?? (await makeRider());
+  const s = await startDelivery(orderId, owner);
+  await acceptJob(r as never, s.id);
+  await pickUp(r as never, s.id);
+  const code = (await db.shipment.findUniqueOrThrow({ where: { id: s.id } })).deliveryCode;
+  await completeDelivery(r as never, orderId, code);
+  return { rider: r, shipmentId: s.id };
+}

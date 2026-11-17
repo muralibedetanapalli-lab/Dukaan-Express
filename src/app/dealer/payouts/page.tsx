@@ -9,6 +9,7 @@ import { formatINR } from "@/lib/money";
 import { fmtDate } from "@/lib/format";
 import { payoutStatus } from "@/lib/payout";
 import { PendingPayoutReviews } from "../payout-list";
+import { PendingRiderWithdrawals } from "../rider-withdrawals";
 
 export const metadata = { title: "Payout approvals" };
 
@@ -23,8 +24,15 @@ export default async function DealerPayoutsPage() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Payout approvals" description="Shops ask to withdraw their earnings. Check the request, then approve it to send it to the platform admin for transfer, or decline it with a reason." />
-      <PendingPayoutReviews dealerId={dealerId} />
+      <PageHeader title="Payout approvals" description="Shops and riders ask to withdraw their earnings. Check each request, then approve it to send it to the platform admin for transfer, or decline it with a reason." />
+      <section className="space-y-3">
+        <h2 className="font-semibold">Shop payouts</h2>
+        <PendingPayoutReviews dealerId={dealerId} />
+      </section>
+      <section className="space-y-3">
+        <h2 className="font-semibold">Rider withdrawals</h2>
+        <PendingRiderWithdrawals dealerId={dealerId} />
+      </section>
 
       <Card className="gap-0 overflow-hidden p-0">
         <p className="border-b px-4 py-3 font-semibold">Reviewed by you</p>

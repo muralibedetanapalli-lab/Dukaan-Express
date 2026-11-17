@@ -32,7 +32,7 @@ flowchart LR
 | Container registry | GitHub Container Registry — free |
 | Logs | Disabled below (`--logs-destination none`); live log streaming still works |
 | Database | Existing server; one more database on it costs nothing extra |
-| Outbound internet (Cashfree/Shiprocket APIs) | Default outbound — no NAT gateway needed |
+| Outbound internet (Cashfree, Gmail SMTP, FCM) | Default outbound — no NAT gateway needed |
 
 **Set a budget alert**: Portal → Cost Management → Budgets → *Add* → ₹100/month with an email alert at 50%. You'll know immediately if anything starts costing money.
 
@@ -195,7 +195,7 @@ az containerapp update -g $RG -n $APP --set-env-vars CASHFREE_APP_ID="<app id>" 
 
 Switch `CASHFREE_ENV=production` (with live keys) when you go live.
 
-Same pattern for `CLOUDINARY_*` (needed for image uploads in production), `SHIPROCKET_*`, `GOOGLE_MAPS_API_KEY`, `FCM_*`, `SMS_*` — see [DEPLOYMENT.md](DEPLOYMENT.md) for where to get each value and the webhook URLs (`https://<FQDN>/api/v1/webhooks/...`).
+Same pattern for `CLOUDINARY_*` (needed for image uploads in production), `GOOGLE_MAPS_API_KEY`, `FCM_*`, `SMS_*` — see [DEPLOYMENT.md](DEPLOYMENT.md) for where to get each value and the webhook URLs (`https://<FQDN>/api/v1/webhooks/...`).
 
 **Customer signup needs email (SMTP).** Until SMTP is configured, production does not show email codes. For a *private pilot only*, `OTP_SANDBOX_IN_PRODUCTION=true` shows the code on screen, which means emails are not really verified, so configure SMTP before a public launch. Add the SMTP password as a secret: `az containerapp secret set -g $RG -n $APP --secrets smtp-pass="<app password>"` then `--set-env-vars SMTP_HOST=smtp.gmail.com SMTP_PORT=465 SMTP_USER=<you@gmail.com> SMTP_PASS=secretref:smtp-pass`.
 

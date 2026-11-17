@@ -1,0 +1,14 @@
+import { z } from "zod";
+import { api } from "@/server/http";
+import { reviewWithdrawal } from "@/server/services/rider";
+
+const zReview = z.discriminatedUnion("approve", [
+  z.object({ approve: z.literal(true), note: z.string().trim().max(300).optional().nullable() }),
+  z.object({ approve: z.literal(false), reason: z.string().trim().min(3, "Give a reason (at least 3 characters)").max(300) }),
+]);
+
+/** Dealer approves a rider withdrawal (sends it to the admin) or declines it. */
+export const POST = api({ roles: ["DEALER"], body: zReview }, async ({ user, params, body }) => {
+  await reviewWithdrawal(user, params.id, body);
+  return { ok: true };
+});

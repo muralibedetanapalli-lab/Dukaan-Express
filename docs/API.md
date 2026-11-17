@@ -17,7 +17,8 @@
 | Payments | `POST /orders/:id/pay`, `POST /payments/verify`, `POST /webhooks/cashfree` |
 | Shop owner | `GET/PATCH /shop/me`, `GET /shop/dashboard`, `GET /shop/orders`, `GET /shop/orders/:id`, `POST /shop/orders/:id/action`, `POST /shop/orders/:id/modification`, `GET /shop/earnings`, `GET/PATCH /shop/bank-account`, `GET/POST /shop/payouts`, `POST /shop/payouts/:id/cancel` |
 | Inventory | `GET/POST /shop/inventory`, `GET/PATCH/DELETE /shop/inventory/:id`, `GET /shop/products/search` |
-| Shiprocket | `GET/POST /shop/orders/:id/shipment`, `GET /admin/shipments`, `POST /webhooks/shiprocket` (alias `/webhooks/courier`) |
+| Delivery | `POST /shop/orders/:id/delivery` (own staff), `GET /orders/:id/track` (customer live tracking), `GET /admin/shipments` |
+| Rider | `PATCH /rider/status`, `POST /rider/location`, `GET /rider/jobs`, `POST /rider/jobs/:id/accept`, `POST /rider/delivery/:id` (release · pickup · complete · failed), `GET/PATCH /rider/bank-account`, `POST /rider/withdrawals` |
 | Admin | `GET /admin/dashboard`, shops, owners, categories, subcategories, products, attributes, orders (+ `/action`), modifications, customers, tickets, settlements (payouts: `POST /admin/settlements/:id` records the transfer, `/reject` declines), coupons, banners, service-areas, audit-logs, webhooks |
 | Reports | `GET /admin/reports?type=&format=csv|xlsx|pdf|json&from=&to=&shopId=` |
 | Settings | `GET/PATCH /admin/settings` |
@@ -45,6 +46,5 @@
 | `CONFLICT` (+`details.reason=CART_SHOP_CONFLICT`) | 409 | Cart contains another shop's items |
 | `INVALID_TRANSITION` | 409 | Order state machine refused the change |
 | `OUT_OF_STOCK`, `SHOP_CLOSED`, `SHOP_NOT_SERVICEABLE`, `MIN_ORDER`, `COD_LIMIT`, `COUPON_INVALID` | 422 | Checkout rule violations |
-| `NO_COURIER`, `COURIER_UNAVAILABLE`, `SHIPMENT_VALIDATION` | 422 | Shipment could not be created |
 | `RATE_LIMITED` | 429 | Too many requests |
-| `UPSTREAM_ERROR` | 502 | Cashfree / Shiprocket error |
+| `UPSTREAM_ERROR` | 502 | Cashfree / email provider error |
