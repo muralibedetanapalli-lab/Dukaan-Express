@@ -9,7 +9,7 @@ export default function StaffLoginPage() {
   return (
     <AuthShell>
       <h1 className="text-2xl font-bold">Staff login</h1>
-      <p className="mt-1 text-sm text-muted-foreground">For platform administrators and shop owners.</p>
+      <p className="mt-1 text-sm text-muted-foreground">For shop owners, dealers, delivery riders and platform administrators.</p>
       <Suspense>
         <StaffLoginForm />
       </Suspense>
