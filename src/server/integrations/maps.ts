@@ -171,7 +171,7 @@ async function nominatimReverse(p: LatLng): Promise<GeocodedAddress | null> {
       if (!a) return null;
       const street = [a.house_number, a.road].filter(Boolean).join(" ");
       const area = a.neighbourhood || a.suburb || a.quarter || a.residential || "";
-      const city = a.city || a.town || a.village || a.city_district || a.county || a.state_district || "";
+      const city = (a.city || a.town || a.village || a.city_district || a.county || a.state_district || "").replace(/\s+(Mandal|Taluk|Tehsil|Tahsil)$/i, "");
       return {
         formatted: [street, area, city].filter(Boolean).join(", ") || j.display_name || "",
         line1: [a.building || a.amenity || "", street, area].filter(Boolean).join(", "),
@@ -187,4 +187,71 @@ async function nominatimReverse(p: LatLng): Promise<GeocodedAddress | null> {
   const next = nominatimChain.then(run, run);
   nominatimChain = next.catch(() => undefined);
   return next;
+}
+
+// ───────────────────────────── Area / pincode search ─────────────────────────────
+
+export interface PlaceResult {
+  lat: number;
+  lng: number;
+  label: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+const searchCache = new Map<string, { at: number; v: PlaceResult[] }>();
+
+/**
+ * Find a place by Indian pincode or by name (area, locality, landmark) with OpenStreetMap Nominatim.
+ * Shares the 1-request-per-second queue with reverse geocoding; results are cached for a day.
+ */
+export async function searchPlaces(query: string): Promise<PlaceResult[]> {
+  const q = query.trim().replace(/\s+/g, " ");
+  if (q.length < 3) return [];
+  const k = q.toLowerCase();
+  const hit = searchCache.get(k);
+  if (hit && Date.now() - hit.at < GEO_TTL) return hit.v;
+
+  const run = async (): Promise<PlaceResult[]> => {
+    const wait = lastNominatimAt + 1100 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastNominatimAt = Date.now();
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("addressdetails", "1");
+      url.searchParams.set("accept-language", "en");
+      url.searchParams.set("countrycodes", "in");
+      url.searchParams.set("limit", "5");
+      if (/^\d{6}$/.test(q)) url.searchParams.set("postalcode", q);
+      else url.searchParams.set("q", q);
+      const res = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: AbortSignal.timeout(6000) });
+      if (!res.ok) return [];
+      const rows = (await res.json()) as { lat: string; lon: string; display_name: string; address?: Record<string, string> }[];
+      return rows.map((r) => {
+        const a = r.address ?? {};
+        const city = (a.city || a.town || a.village || a.city_district || a.county || a.state_district || "").replace(/\s+(Mandal|Taluk|Tehsil|Tahsil)$/i, "");
+        const area = a.suburb || a.neighbourhood || a.quarter || a.village || a.town || "";
+        return {
+          lat: Number(r.lat),
+          lng: Number(r.lon),
+          label: [area, city, a.postcode].filter(Boolean).join(", ") || r.display_name,
+          city,
+          state: a.state || "",
+          pincode: (a.postcode || (/^\d{6}$/.test(q) ? q : "")).replace(/\s/g, "").slice(0, 6),
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+  const next = nominatimChain.then(run, run);
+  nominatimChain = next.catch(() => undefined);
+  const v = await next;
+  if (v.length) {
+    if (searchCache.size > 2000) searchCache.clear();
+    searchCache.set(k, { at: Date.now(), v });
+  }
+  return v;
 }
