@@ -12,9 +12,12 @@ export default async function StaffLoginPage() {
   return (
     <AuthShell>
       <h1 className="text-2xl font-bold">Staff login</h1>
-      <p className="mt-1 text-sm text-muted-foreground">For shop owners, dealers, delivery riders and platform administrators.</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {app === "shop" ? "For shop owners and dealers." : app === "rider" ? "For delivery riders." : "For shop owners, dealers, delivery riders and platform administrators."}
+      </p>
       <Suspense>
-        <StaffLoginForm />
+        {/* Rider signup belongs to the Rider app (and the website), not the Partner app. */}
+        <StaffLoginForm showRiderSignup={app !== "shop"} />
       </Suspense>
       {app !== "shop" && app !== "rider" && (
         <p className="mt-8 text-center text-xs text-muted-foreground">
