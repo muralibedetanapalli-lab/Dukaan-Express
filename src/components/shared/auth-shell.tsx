@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { BrandName } from "./brand";
+import { appHome, nativeApp } from "@/server/native-app";
 
-export function AuthShell({ children }: { children: React.ReactNode }) {
+export async function AuthShell({ children }: { children: React.ReactNode }) {
+  // Inside the Rider / Partner app the logo leads to that app, not the customer store.
+  const home = appHome(await nativeApp());
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-600 to-lime-500 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold">
+        <Link href={home} className="flex items-center gap-2 text-lg font-bold">
           <span className="grid size-9 place-items-center rounded-xl bg-white/20">
             <Zap className="size-5" />
           </span>
@@ -21,7 +24,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       </div>
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
-          <Link href="/" className="mb-8 flex items-center gap-2 text-lg font-bold text-primary lg:hidden">
+          <Link href={home} className="mb-8 flex items-center gap-2 text-lg font-bold text-primary lg:hidden">
             <Zap className="size-5" /> <BrandName />
           </Link>
           {children}

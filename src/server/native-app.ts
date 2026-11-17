@@ -7,3 +7,8 @@ export async function nativeApp(): Promise<"customer" | "shop" | "rider" | null>
   const m = ua.match(/DukaanApp\/[\d.]+ \((customer|shop|rider);/);
   return (m?.[1] as "customer" | "shop" | "rider" | undefined) ?? null;
 }
+
+/** Where the app's own logo / "back" links should go (never into another app's area). */
+export function appHome(app: Awaited<ReturnType<typeof nativeApp>>) {
+  return app === "rider" ? "/rider" : app === "shop" ? "/shop" : "/";
+}
