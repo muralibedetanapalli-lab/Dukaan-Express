@@ -2,10 +2,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 import { AuthShell } from "@/components/shared/auth-shell";
+import { nativeApp } from "@/server/native-app";
 
 export const metadata = { title: "Log in" };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Inside the customer app, staff (shop owners, dealers, riders, admins) use their own apps.
+  const inCustomerApp = (await nativeApp()) === "customer";
   return (
     <AuthShell>
       <h1 className="text-2xl font-bold">Welcome back</h1>
@@ -13,12 +16,14 @@ export default function LoginPage() {
       <Suspense>
         <LoginForm />
       </Suspense>
-      <p className="mt-8 text-center text-xs text-muted-foreground">
-        Shop owner or admin?{" "}
-        <Link href="/login/staff" className="font-medium text-primary hover:underline">
-          Staff login
-        </Link>
-      </p>
+      {!inCustomerApp && (
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          Shop owner or admin?{" "}
+          <Link href="/login/staff" className="font-medium text-primary hover:underline">
+            Staff login
+          </Link>
+        </p>
+      )}
     </AuthShell>
   );
 }
