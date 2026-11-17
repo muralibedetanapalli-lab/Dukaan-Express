@@ -13,7 +13,7 @@ A multi-vendor instant-delivery marketplace. Admins onboard local shops, shop ow
 | API docs (Swagger) | `/api-docs` | Developers |
 | Android apps | [mobile/](mobile/README.md) — *Dukaan Express* (customers) and *Dukaan Partner* (shop owners) | Phones |
 
-**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · PostgreSQL + Prisma 7 · JWT sessions (jose) · Cashfree · Leaflet + OpenStreetMap · Google Maps · Firebase Cloud Messaging · Cloudinary · Vitest.
+**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · PostgreSQL + Prisma 7 · JWT sessions (jose) · Cashfree · Leaflet + OpenStreetMap (Nominatim, OpenRouteService) · Firebase Cloud Messaging · Cloudinary · Vitest.
 
 ## Documentation
 
@@ -78,7 +78,7 @@ Every third-party integration uses an isolated sandbox adapter until you add its
 
 - **Payment sandbox:** without Cashfree keys, the checkout opens a sandbox dialog with "Simulate success" and "Simulate failure".
 - **Delivery:** no third party. Riders use the Dukaan Rider app (or `/rider` in a browser): go online, accept a job, pick up, and deliver with the customer's 4-digit code. Shops on own delivery do the same from the order page.
-- **Maps:** haversine distance × 1.3 road factor.
+- **Maps:** address lookup uses OpenStreetMap (free, no key). Road distances use OpenRouteService when `ORS_API_KEY` is set, otherwise straight-line × 1.3.
 - **Email:** verification and password-reset codes are logged and shown on screen (in production only when `OTP_SANDBOX_IN_PRODUCTION=true`).
 - **SMS:** not used for login right now (SMS OTP login is switched off).
 - **Storage:** images are saved to `public/uploads`.

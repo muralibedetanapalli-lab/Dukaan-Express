@@ -38,8 +38,11 @@ Each integration switches from its sandbox adapter to live automatically once it
 ### Deliveries and riders
 No courier account is needed. Set each shop's delivery mode, add riders (Dealer → Riders or Admin → Riders), and give riders the **Dukaan Rider** app (`mobile/rider`). For job alerts on riders' phones, add an Android app `in.dukaanexpress.rider` to the same Firebase project and put its `google-services.json` in `mobile/rider/android/app/` before building.
 
-### Google Maps
-`GOOGLE_MAPS_API_KEY` (server; Distance Matrix + Geocoding APIs). Without it, distances use haversine × 1.3 and reverse geocoding falls back to the nearest service area.
+### Maps (free by default)
+- **Address from GPS:** OpenStreetMap Nominatim — no key, free (max 1 request/second; results cached for a day).
+- **Road distances:** set `ORS_API_KEY` from [openrouteservice.org](https://openrouteservice.org/dev/#/signup) (free plan: 500 matrix requests/day, no card). Without it, distances are straight-line × 1.3.
+- **Customer live map:** OpenStreetMap tiles via Leaflet, no key.
+- Optional paid upgrade: `GOOGLE_MAPS_API_KEY` (Distance Matrix + Geocoding) replaces both.
 
 ### Firebase Cloud Messaging
 Create a service account with the *Firebase Cloud Messaging API* role → `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` (keep `\n` escapes). Web clients register tokens via `POST /api/v1/devices`. In-app notifications and SSE work without FCM.

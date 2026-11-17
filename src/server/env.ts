@@ -19,6 +19,7 @@ const schema = z.object({
   CASHFREE_ENV: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.enum(["sandbox", "production"]).default("sandbox")),
 
   GOOGLE_MAPS_API_KEY: blank,
+  ORS_API_KEY: blank, // OpenRouteService (free plan) for road distances; optional
 
   FCM_PROJECT_ID: blank,
   FCM_CLIENT_EMAIL: blank,
@@ -62,7 +63,9 @@ export function integrationModes() {
   const e = env();
   return {
     cashfree: e.CASHFREE_APP_ID && e.CASHFREE_SECRET_KEY ? "live" : "mock",
-    maps: e.GOOGLE_MAPS_API_KEY ? "live" : "mock",
+    // Address lookup is always live (OpenStreetMap Nominatim, free) unless Google is configured.
+    maps: "live",
+    roadDistance: e.GOOGLE_MAPS_API_KEY ? "google" : e.ORS_API_KEY ? "openrouteservice" : "estimate",
     fcm: e.FCM_PROJECT_ID && e.FCM_CLIENT_EMAIL && e.FCM_PRIVATE_KEY ? "live" : "mock",
     sms: e.SMS_PROVIDER && e.SMS_API_KEY ? "live" : "mock",
     storage: e.CLOUDINARY_CLOUD_NAME && e.CLOUDINARY_API_KEY && e.CLOUDINARY_API_SECRET ? "live" : "mock",

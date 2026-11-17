@@ -11,6 +11,7 @@ for (const k of [
   "SMTP_USER",
   "SMTP_PASS",
   "GOOGLE_MAPS_API_KEY",
+  "ORS_API_KEY",
   "FCM_PROJECT_ID",
   "SMS_PROVIDER",
   "CLOUDINARY_CLOUD_NAME",

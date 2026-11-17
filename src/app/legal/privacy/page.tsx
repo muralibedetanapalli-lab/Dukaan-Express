@@ -48,7 +48,7 @@ export default async function PrivacyPage() {
           <li><b>The delivery person</b> (a {c.brand} rider or the shop&apos;s staff): your name, phone number and delivery address, so they can deliver your order.</li>
           <li><b>Riders:</b> while a rider is delivering your order, their live location is shared with you. Riders&apos; locations are collected only while they are online in the Dukaan Rider app.</li>
           <li><b>Cashfree Payments</b>, to process payments and refunds.</li>
-          <li><b>Service providers</b> that run parts of the Platform on our behalf: Microsoft Azure (hosting and database, in India), Google Firebase (push notifications), Google Maps (address lookup), Cloudinary (image storage), and our email and SMS providers (verification codes and order alerts).</li>
+          <li><b>Service providers</b> that run parts of the Platform on our behalf: Microsoft Azure (hosting and database, in India), Google Firebase (push notifications), OpenStreetMap (maps and address lookup from your location) and OpenRouteService (delivery distances), Cloudinary (image storage), and our email and SMS providers (verification codes and order alerts).</li>
           <li><b>Authorities</b>, when required by law or to protect rights, safety and property.</li>
         </List>
         <p>These parties may only use your data to provide their service to us and must protect it.</p>

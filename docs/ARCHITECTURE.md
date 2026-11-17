@@ -33,7 +33,7 @@ flowchart LR
     subgraph Adapters["Integration adapters (src/server/integrations)"]
       LF[Leaflet + OSM tiles<br/>customer live map]
       RZ[Cashfree<br/>live | mock]
-      GM[Google Maps<br/>live | haversine]
+      GM[Maps<br/>OSM Nominatim · ORS / Google · haversine]
       FCM[Firebase FCM<br/>live | log]
       SMS[SMS OTP<br/>live | console]
       ST[Storage<br/>Cloudinary | local disk]
@@ -43,7 +43,7 @@ flowchart LR
 
   DB[(PostgreSQL<br/>Prisma 7)]
   EXT2[(Cashfree PG API)]
-  EXT3[(Google Maps)]
+  EXT3[(OpenStreetMap / ORS)]
   EXT4[(FCM)]
 
   C & S & A --> P --> API --> MW --> Services
