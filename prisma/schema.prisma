@@ -99,6 +99,11 @@ enum RiderKycStatus {
   REJECTED
 }
 
+enum BadgeKind {
+  SHOP
+  RIDER
+}
+
 enum WalletEntryType {
   DELIVERY_EARNING // + delivery fee for a completed delivery
   COD_COLLECTED // − cash the rider collected from a cash-on-delivery customer (rider keeps it)
@@ -279,6 +284,7 @@ model Shop {
   commissions Commission[]
   settlements ShopSettlement[]
   bankAccount ShopBankAccount?
+  badges      Badge[]
   reviews     Review[]
   coupons     Coupon[]
   cartItems   CartItem[]
@@ -1077,6 +1083,7 @@ model Rider {
   wallet      RiderWalletEntry[]
   withdrawals RiderWithdrawal[]
   bankAccount RiderBankAccount?
+  badges      Badge[]
 
   @@index([isOnline])
   @@index([dealerId])
@@ -1138,4 +1145,26 @@ model RiderBankAccount {
   updatedById       String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+/// Monthly "star" badge: the top-scoring shop in each shop category and the top rider in each area.
+/// `period` is the IST month it was earned for (e.g. "2026-11"); the winner shows the star during the next month.
+model Badge {
+  id           String    @id @default(cuid())
+  kind         BadgeKind
+  period       String
+  categoryKey  String // shop: categoryId or "none"; rider: serviceAreaId or "none"
+  categoryName String
+  shopId       String?
+  shop         Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  riderId      String?
+  rider        Rider?    @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  score        Float
+  stats        Json
+  createdAt    DateTime  @default(now())
+
+  @@unique([kind, period, categoryKey])
+  @@index([shopId])
+  @@index([riderId])
+  @@index([period])
 }

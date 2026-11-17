@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pill } from "@/components/shared/status-badge";
@@ -14,6 +16,7 @@ export interface RiderRow {
   dealer?: string | null;
   status: string;
   kyc: string;
+  star?: string | null;
   area?: string | null;
   online: boolean;
   busy: boolean;
@@ -50,7 +53,10 @@ export function RidersTable({ rows, base, showDealer }: { rows: RiderRow[]; base
           {rows.map((r) => (
             <TableRow key={r.id}>
               <TableCell>
-                <p className="font-semibold">{r.name}</p>
+                <Link href={`${base}/${r.id}`} className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
+                  {r.name}
+                  {r.star && <Star className="size-3.5 fill-amber-400 text-amber-500" aria-label={`Top rider · ${r.star}`} />}
+                </Link>
                 <p className="text-xs text-muted-foreground">
                   {r.phone} · {r.email}
                 </p>

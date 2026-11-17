@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatCard, EmptyState } from "@/components/shared/misc";
 import { OrderStatusBadge } from "@/components/shared/status-badge";
+import { LeaderboardCard } from "@/components/shared/leaderboard-card";
 import { formatINR } from "@/lib/money";
 import { fmtAgo } from "@/lib/format";
 
@@ -33,6 +34,8 @@ export default async function ShopDashboardPage() {
         <StatCard label="Packed / dispatch" value={d.packed} icon={PackageCheck} href="/shop/orders?tab=dispatch" />
         <StatCard label="Completed" value={d.completed} icon={CheckCircle2} tone="success" href="/shop/orders?tab=completed" />
       </div>
+
+      <LeaderboardCard kind="SHOP" categoryKey={shop.categoryId ?? "none"} meId={shop.id} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <Card className="gap-0 p-0">

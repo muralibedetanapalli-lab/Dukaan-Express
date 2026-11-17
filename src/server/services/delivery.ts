@@ -9,6 +9,7 @@ import type { OrderStatusKey } from "@/lib/order-status";
 import { audit } from "./audit";
 import { afterTransition, transitionOrder, SYSTEM, type OrderActor } from "./order";
 import { deliveryFeeFor } from "./pricing";
+import { riderStar } from "./badges";
 import { getSettings } from "./settings";
 import { adminUserIds, customerUserId, notifyAdmins, notifyCustomer, notifyShop, notifyUsers, shopOwnerUserIds, signalUsers } from "./notification";
 
@@ -402,6 +403,7 @@ export async function trackingFor(order: { id: string; status: string; deliveryL
   if (!s) return null;
   const live = s.mode === "RIDER" && s.rider && (s.status === "COURIER_ASSIGNED" || s.status === "OUT_FOR_DELIVERY");
   const showCode = ["SHIPMENT_CREATED", "COURIER_ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY"].includes(order.status);
+  const star = live && s.riderId ? await riderStar(s.riderId) : null;
   return {
     mode: s.mode,
     status: s.status,
@@ -416,6 +418,7 @@ export async function trackingFor(order: { id: string; status: string; deliveryL
           lat: s.rider!.lat,
           lng: s.rider!.lng,
           at: s.rider!.locationAt,
+          star: star ? `Top rider in ${star.categoryName}` : null,
         }
       : null,
   };

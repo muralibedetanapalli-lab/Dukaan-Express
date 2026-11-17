@@ -28,7 +28,7 @@ export async function register() {
       const res = await fetch(url, { headers: { authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(90_000) });
       const body = await res.text();
       if (!res.ok) console.warn(`[maintenance] ${res.status} ${body.slice(0, 200)}`);
-      else if (!/"expired":0,"refundsSettled":0,"autoRejected":0,"waitingForRider":0,"noRiderAlerts":0/.test(body)) console.info(`[maintenance] ${body.slice(0, 300)}`);
+      else if (!/"expired":0,"refundsSettled":0,"autoRejected":0,"waitingForRider":0,"noRiderAlerts":0,"badgesAwarded":0/.test(body)) console.info(`[maintenance] ${body.slice(0, 300)}`);
     } catch (e) {
       console.warn("[maintenance] failed:", e instanceof Error ? e.message : e);
     } finally {

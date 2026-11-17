@@ -3,6 +3,7 @@ import { Clock, MapPin, PackageX, Phone, Star } from "lucide-react";
 import { AppError } from "@/server/errors";
 import { readLocationCookie } from "@/server/services/location";
 import { shopStorefront } from "@/server/services/catalog";
+import { shopStar, periodLabel } from "@/server/services/badges";
 import { ProductGrid } from "@/components/customer/product-card";
 import { EmptyState } from "@/components/shared/misc";
 import { Pill } from "@/components/shared/status-badge";
@@ -22,6 +23,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
     throw e;
   }
   const { shop, reach, products } = data;
+  const star = await shopStar(shop.id);
   const groups = new Map<string, typeof products>();
   for (const p of products) groups.set(p.categoryName, [...(groups.get(p.categoryName) ?? []), p]);
 
@@ -35,6 +37,11 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold">{shop.name}</h1>
+            {star && (
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                <Star className="size-3.5 fill-amber-400 text-amber-500" /> Top {star.categoryName} shop · {periodLabel(star.period)}
+              </p>
+            )}
             {reach ? reach.orderable ? <Pill tone="success">Open now</Pill> : <Pill tone="danger">Closed</Pill> : <Pill tone="warning">Doesn&apos;t deliver to you</Pill>}
           </div>
           {shop.description && <p className="mt-1 text-sm text-muted-foreground">{shop.description}</p>}

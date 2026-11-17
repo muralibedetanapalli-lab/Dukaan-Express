@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bike, KeyRound, Phone, Store } from "lucide-react";
+import { Bike, KeyRound, Phone, Star, Store } from "lucide-react";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ export interface Tracking {
   deliveryCode: string | null;
   shop: { name: string; phone: string | null; lat: number | null; lng: number | null };
   drop: { lat: number; lng: number };
-  rider: { name: string | null; phone: string | null; vehicle: string | null; lat: number | null; lng: number | null; at: string | Date | null } | null;
+  rider: { name: string | null; phone: string | null; vehicle: string | null; lat: number | null; lng: number | null; at: string | Date | null; star?: string | null } | null;
 }
 
 const LIVE = ["SHIPMENT_CREATED", "COURIER_ASSIGNED", "PICKED_UP", "OUT_FOR_DELIVERY"];
@@ -123,7 +123,14 @@ export function LiveTracking({ orderId, initialStatus, initial }: { orderId: str
               <Bike className="size-5" />
             </span>
             <div className="text-sm">
-              <p className="font-semibold">{t.rider.name}</p>
+              <p className="flex items-center gap-1.5 font-semibold">
+                {t.rider.name}
+                {t.rider.star && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                    <Star className="size-3 fill-amber-400 text-amber-500" /> {t.rider.star}
+                  </span>
+                )}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {status === "COURIER_ASSIGNED" ? "On the way to the shop" : "On the way to you"}
                 {t.rider.vehicle ? ` · ${t.rider.vehicle}` : ""}

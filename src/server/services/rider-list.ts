@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/server/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { RiderRow } from "@/components/shared/riders-table";
+import { currentHolders } from "./badges";
 
 /** Rows for the riders tables (dealer portal / admin console). */
 export async function riderRows(where: Prisma.RiderWhereInput): Promise<RiderRow[]> {
@@ -19,6 +20,7 @@ export async function riderRows(where: Prisma.RiderWhereInput): Promise<RiderRow
   const ids = riders.map((r) => r.id);
   const balances = ids.length ? await db.riderWalletEntry.groupBy({ by: ["riderId"], where: { riderId: { in: ids } }, _sum: { amount: true } }) : [];
   const bal = new Map(balances.map((b) => [b.riderId, b._sum.amount ?? 0]));
+  const stars = (await currentHolders()).riders;
   return riders.map((r) => ({
     id: r.id,
     name: r.user.name ?? "Rider",
@@ -28,6 +30,7 @@ export async function riderRows(where: Prisma.RiderWhereInput): Promise<RiderRow
     dealer: r.dealer?.user.name ?? null,
     status: r.user.status,
     kyc: r.kycStatus,
+    star: stars.get(r.id)?.categoryName ?? null,
     area: r.serviceArea?.city ?? null,
     online: r.isOnline,
     busy: r.deliveries.length > 0,

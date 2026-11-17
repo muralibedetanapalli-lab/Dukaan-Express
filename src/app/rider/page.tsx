@@ -9,6 +9,7 @@ import { EmptyState, StatCard } from "@/components/shared/misc";
 import { Pill } from "@/components/shared/status-badge";
 import { formatINR } from "@/lib/money";
 import { AcceptJobButton, ActiveDeliveryActions } from "./rider-actions";
+import { LeaderboardCard } from "@/components/shared/leaderboard-card";
 
 export const metadata = { title: "Deliveries" };
 
@@ -73,6 +74,8 @@ export default async function RiderHome() {
           })}
         </section>
       )}
+
+      <LeaderboardCard kind="RIDER" categoryKey={rider.serviceAreaId ?? "none"} meId={riderId} />
     </div>
   );
 }

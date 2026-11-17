@@ -8,6 +8,7 @@ import { expireUnpaidOrders, reconcileRefunds } from "@/server/services/payment"
 import { transitionOrder, SYSTEM } from "@/server/services/order";
 import { getSettings } from "@/server/services/settings";
 import { sweepWaitingDeliveries } from "@/server/services/delivery";
+import { ensurePreviousMonthBadges } from "@/server/services/badges";
 
 export const runtime = "nodejs";
 
@@ -43,12 +44,18 @@ export async function GET(req: NextRequest) {
       return { waiting: 0, alerted: 0 };
     });
 
+    // Award last month's star badges once the month is over (idempotent).
+    const badges = await ensurePreviousMonthBadges().catch((e) => {
+      console.warn("[cron] badges failed", e);
+      return 0;
+    });
+
     const day = new Date(Date.now() - 86400_000);
     const [otps, keys] = await Promise.all([
       db.otp.deleteMany({ where: { createdAt: { lt: day } } }),
       db.idempotencyKey.deleteMany({ where: { createdAt: { lt: day } } }),
     ]);
-    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, waitingForRider: riders.waiting, noRiderAlerts: riders.alerted, prunedOtps: otps.count, prunedKeys: keys.count } });
+    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, waitingForRider: riders.waiting, noRiderAlerts: riders.alerted, badgesAwarded: badges, prunedOtps: otps.count, prunedKeys: keys.count } });
   } catch (e) {
     return errorResponse(e);
   }

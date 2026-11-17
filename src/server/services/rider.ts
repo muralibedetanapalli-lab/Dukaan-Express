@@ -62,6 +62,8 @@ export async function createRider(actor: SessionUser, input: z.infer<typeof zRid
   if (!passwordPolicy.test(password)) throw badRequest(passwordPolicy.message);
   const clash = await db.user.findFirst({ where: { OR: [{ email: input.email }, { phone: input.phone }] } });
   if (clash) throw conflict("A user with this email or mobile number already exists");
+  // The rider works in their dealer region (first one if the dealer has several) — used for job offers and leaderboards.
+  const area = dealerId ? await db.serviceArea.findFirst({ where: { dealerId }, orderBy: { city: "asc" }, select: { id: true } }) : null;
   const user = await db.user.create({
     data: {
       role: "RIDER",
@@ -70,7 +72,7 @@ export async function createRider(actor: SessionUser, input: z.infer<typeof zRid
       phone: input.phone,
       passwordHash: await hashPassword(password),
       // Added by their dealer or an admin: verified by that person, so no document review is needed.
-      rider: { create: { dealerId, vehicleType: input.vehicleType, vehicleNumber: input.vehicleNumber || null, kycStatus: "APPROVED", kycReviewedAt: new Date(), kycReviewedById: actor.id } },
+      rider: { create: { dealerId, serviceAreaId: area?.id ?? null, vehicleType: input.vehicleType, vehicleNumber: input.vehicleNumber || null, kycStatus: "APPROVED", kycReviewedAt: new Date(), kycReviewedById: actor.id } },
     },
     include: { rider: true },
   });

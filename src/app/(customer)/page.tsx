@@ -3,6 +3,7 @@ import { Clock, MapPinOff, Star } from "lucide-react";
 import { getSessionUser } from "@/server/auth/session";
 import { readLocationCookie } from "@/server/services/location";
 import { homeFeed } from "@/server/services/catalog";
+import { currentHolders } from "@/server/services/badges";
 import { ProductRail } from "@/components/customer/product-card";
 import { EmptyState } from "@/components/shared/misc";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,7 @@ export default async function HomePage() {
       </div>
     );
   }
-  const feed = await homeFeed({ lat: loc.lat, lng: loc.lng }, user?.customerId ?? null);
+  const [feed, holders] = await Promise.all([homeFeed({ lat: loc.lat, lng: loc.lng }, user?.customerId ?? null), currentHolders()]);
 
   if (!feed.shops.length) {
     return (
@@ -87,6 +88,11 @@ export default async function HomePage() {
               <div className="min-w-0">
                 <p className="truncate font-semibold">{s.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{s.categoryName}</p>
+                {holders.shops.has(s.id) && (
+                  <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                    <Star className="size-3 fill-amber-400 text-amber-500" /> Top {holders.shops.get(s.id)!.categoryName} shop
+                  </p>
+                )}
                 <p className="mt-1 flex items-center gap-2 text-xs font-medium">
                   {s.orderable ? (
                     <span className="flex items-center gap-1 text-primary">
