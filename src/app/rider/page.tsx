@@ -1,4 +1,5 @@
-import { Bike, IndianRupee, MapPin, Navigation, Package, Phone, Store } from "lucide-react";
+import { Bike, IndianRupee, MapPin, Package, Phone, Store } from "lucide-react";
+import { RouteMap } from "./route-map";
 import { getSessionUser } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { activeDelivery, availableJobs } from "@/server/services/delivery";
@@ -13,7 +14,6 @@ import { LeaderboardCard } from "@/components/shared/leaderboard-card";
 
 export const metadata = { title: "Deliveries" };
 
-const directions = (lat: number, lng: number) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
 
 export default async function RiderHome() {
   const user = (await getSessionUser())!;
@@ -99,14 +99,8 @@ function ActiveCard({ d }: { d: NonNullable<Awaited<ReturnType<typeof activeDeli
           </p>
           <p className="text-xs text-muted-foreground">{shopAddr ? `${shopAddr.line1}${shopAddr.landmark ? `, ${shopAddr.landmark}` : ""}, ${shopAddr.city}` : ""}</p>
           {toShop && (
-            <div className="mt-2 flex gap-2">
-              {shopAddr && (
-                <Button asChild size="sm" variant="outline">
-                  <a href={directions(shopAddr.latitude, shopAddr.longitude)} target="_blank" rel="noreferrer">
-                    <Navigation /> Navigate
-                  </a>
-                </Button>
-              )}
+            <div className="mt-2 space-y-2">
+              {shopAddr && <RouteMap kind="shop" label="shop" to={{ lat: shopAddr.latitude, lng: shopAddr.longitude }} />}
               <Button asChild size="sm" variant="outline">
                 <a href={`tel:${o.shop.contactPhone}`}>
                   <Phone /> Call shop
@@ -123,12 +117,8 @@ function ActiveCard({ d }: { d: NonNullable<Awaited<ReturnType<typeof activeDeli
             {[drop.line1, drop.line2, drop.landmark, drop.city, drop.pincode].filter(Boolean).join(", ")}
           </p>
           {!toShop && (
-            <div className="mt-2 flex gap-2">
-              <Button asChild size="sm" variant="outline">
-                <a href={directions(o.deliveryLat, o.deliveryLng)} target="_blank" rel="noreferrer">
-                  <Navigation /> Navigate
-                </a>
-              </Button>
+            <div className="mt-2 space-y-2">
+              <RouteMap kind="customer" label="customer" to={{ lat: o.deliveryLat, lng: o.deliveryLng }} />
               <Button asChild size="sm" variant="outline">
                 <a href={`tel:${o.contactPhone}`}>
                   <Phone /> Call customer

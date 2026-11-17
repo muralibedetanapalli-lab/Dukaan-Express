@@ -98,6 +98,64 @@ async function orsMatrix(origins: LatLng[], destination: LatLng): Promise<Row[]>
   });
 }
 
+// ───────────────────────────── Road route (rider map) ─────────────────────────────
+
+export interface RouteLine {
+  /** [lat, lng] points along the road; just the two ends when no road route is available. */
+  points: [number, number][];
+  distanceKm: number;
+  durationMinutes: number | null;
+  source: "openrouteservice" | "haversine";
+}
+
+const routeCache = new Map<string, { at: number; v: RouteLine }>();
+
+/** Road route for drawing on the rider's map. OpenRouteService Directions if ORS_API_KEY is set (free plan), else a straight line. */
+export async function routeLine(from: LatLng, to: LatLng): Promise<RouteLine> {
+  // ~110 m start grid: the route is re-fetched only after the rider has moved a bit.
+  const k = `${from.lat.toFixed(3)},${from.lng.toFixed(3)}>${to.lat.toFixed(5)},${to.lng.toFixed(5)}`;
+  const hit = routeCache.get(k);
+  if (hit && Date.now() - hit.at < TTL) return hit.v;
+  const straight: RouteLine = {
+    points: [
+      [from.lat, from.lng],
+      [to.lat, to.lng],
+    ],
+    distanceKm: Math.round(haversineKm(from, to) * ROAD_FACTOR * 100) / 100,
+    durationMinutes: null,
+    source: "haversine",
+  };
+  const apiKey = env().ORS_API_KEY;
+  if (!apiKey) return straight;
+  try {
+    const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json", Accept: "application/geo+json" },
+      body: JSON.stringify({ coordinates: [
+        [from.lng, from.lat],
+        [to.lng, to.lat],
+      ] }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) throw new Error(`ORS ${res.status}`);
+    const json = (await res.json()) as { features?: { geometry: { coordinates: [number, number][] }; properties: { summary?: { distance?: number; duration?: number } } }[] };
+    const f = json.features?.[0];
+    if (!f) throw new Error("no route");
+    const v: RouteLine = {
+      points: f.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+      distanceKm: Math.round(((f.properties.summary?.distance ?? 0) / 1000) * 100) / 100,
+      durationMinutes: f.properties.summary?.duration != null ? Math.max(1, Math.round(f.properties.summary.duration / 60)) : null,
+      source: "openrouteservice",
+    };
+    if (routeCache.size > 2000) routeCache.clear();
+    routeCache.set(k, { at: Date.now(), v });
+    return v;
+  } catch (err) {
+    console.warn("[maps] route failed, drawing a straight line", err instanceof Error ? err.message : err);
+    return straight;
+  }
+}
+
 // ───────────────────────────── Address from GPS ─────────────────────────────
 
 export interface GeocodedAddress {
