@@ -72,8 +72,8 @@ export async function LeaderboardCard({ kind, categoryKey, meId }: { kind: "SHOP
       {mine && !mine.qualifies && <p className="text-xs text-muted-foreground">Deliver at least {MIN_DELIVERED} orders this month to qualify for the star.</p>}
       <p className="text-xs text-muted-foreground">
         {kind === "SHOP"
-          ? "Points: delivered orders, boosted by customer ratings, minus orders you reject or miss. This month's winner gets the star next month."
-          : "Points: deliveries, boosted by on-time delivery, minus failed deliveries. This month's winner gets the star next month."}
+          ? "Points: delivered orders × your customer rating (5★ counts in full, lower ratings count less), minus orders you reject or miss. This month's winner gets the star next month."
+          : "Points: deliveries × your customer rating and on-time delivery (5★ and on time count in full), minus failed deliveries. This month's winner gets the star next month."}
       </p>
     </Card>
   );

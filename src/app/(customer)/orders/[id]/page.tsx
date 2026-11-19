@@ -71,6 +71,8 @@ export default async function OrderDetailPage({ params, searchParams }: { params
             cancellable={cancellable}
             needsPayment={order.status === "PAYMENT_PENDING"}
             canReview={order.status === "DELIVERED" && !order.review}
+            shopName={order.shop.name}
+            riderName={order.shipment?.mode === "RIDER" && order.shipment.rider ? (order.shipment.rider.user.name ?? "your rider") : null}
             supportPhone={settings.platform.supportPhone}
           />
 

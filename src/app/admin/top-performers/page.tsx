@@ -85,8 +85,8 @@ export default async function TopPerformersPage() {
             key={b.categoryKey}
             board={b}
             href={(e) => `/admin/riders/${e.riderId}`}
-            cols={["Delivered", "On time", "Failed"]}
-            row={(e) => [e.delivered, e.onTimePct != null ? `${e.onTimePct}%` : "—", e.failed]}
+            cols={["Delivered", "Rating", "On time", "Failed"]}
+            row={(e) => [e.delivered, e.rating != null ? `★ ${e.rating}` : "—", e.onTimePct != null ? `${e.onTimePct}%` : "—", e.failed]}
           />
         ))}
       </section>

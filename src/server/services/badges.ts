@@ -6,9 +6,10 @@ import { notifyShop, notifyUsers } from "./notification";
 /**
  * Monthly "star" badges (months in India time).
  *  - Shops compete within their shop category, riders within their area.
- *  - Shop score  = delivered × (0.5 + 0.5 × rating/5) − 2 × orders rejected or ignored by the shop.
- *    Rating = that month's average review; else the shop's overall rating; else a neutral 4★.
- *  - Rider score = delivered × (0.5 + 0.5 × on-time share) − 2 × failed delivery attempts.
+ *  - Customer ratings drive the score: quality(r) = 0.2 + 0.8 × (r − 1)/4, so 5★ = 1, 4★ = 0.8, 3★ = 0.6, 1★ = 0.2.
+ *    Rating = that month's average; else the overall average; else a neutral 4★ (not yet rated).
+ *  - Shop score  = delivered × quality(shop rating) − 2 × orders rejected or ignored by the shop.
+ *  - Rider score = delivered × (0.75 × quality(rider rating) + 0.25 × on-time share) − 2 × failed delivery attempts.
  *    On time = delivered within the promised ETA + 10 minutes of the order being placed.
  *  - At least MIN_DELIVERED deliveries in the month to qualify.
  *  - Last month's winners hold the star for the whole current month; this month's ranking is a live leaderboard.
@@ -41,6 +42,9 @@ export function periodLabel(period: Period) {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+const NEUTRAL_RATING = 4;
+/** 1★ → 0.2 … 5★ → 1. */
+export const quality = (rating: number) => 0.2 + 0.8 * ((Math.min(5, Math.max(1, rating)) - 1) / 4);
 
 export interface ShopEntry {
   shopId: string;
@@ -57,6 +61,7 @@ export interface RiderEntry {
   name: string;
   delivered: number;
   onTimePct: number | null;
+  rating: number | null;
   failed: number;
   score: number;
   qualifies: boolean;
@@ -96,7 +101,7 @@ export async function shopLeaderboards(period: Period): Promise<Board<ShopEntry>
     const rej = r.get(s.id) ?? 0;
     if (!del && !rej) continue;
     const rating = rv.get(s.id) ?? (s.ratingCount > 0 ? s.rating : null);
-    const score = round1(del * (0.5 + 0.5 * ((rating ?? 4) / 5)) - 2 * rej);
+    const score = round1(del * quality(rating ?? NEUTRAL_RATING) - 2 * rej);
     const key = s.categoryId ?? "none";
     if (!boards.has(key)) boards.set(key, { categoryKey: key, categoryName: s.category?.name ?? "Other shops", entries: [] });
     boards.get(key)!.entries.push({ shopId: s.id, name: s.name, delivered: del, rejected: rej, rating: rating != null ? round1(rating) : null, score, qualifies: del >= MIN_DELIVERED, rank: 0 });
@@ -108,10 +113,10 @@ export async function shopLeaderboards(period: Period): Promise<Board<ShopEntry>
 
 export async function riderLeaderboards(period: Period): Promise<Board<RiderEntry>[]> {
   const { start, end } = rangeOf(period);
-  const [riders, delivered, failed] = await Promise.all([
+  const [riders, delivered, failed, reviews] = await Promise.all([
     db.rider.findMany({
       where: { kycStatus: "APPROVED", user: { deletedAt: null } },
-      select: { id: true, serviceAreaId: true, serviceArea: { select: { city: true } }, user: { select: { name: true } } },
+      select: { id: true, rating: true, ratingCount: true, serviceAreaId: true, serviceArea: { select: { city: true } }, user: { select: { name: true } } },
     }),
     db.shipment.findMany({
       where: { mode: "RIDER", status: "DELIVERED", riderId: { not: null }, deliveredAt: { gte: start, lt: end } },
@@ -121,7 +126,9 @@ export async function riderLeaderboards(period: Period): Promise<Board<RiderEntr
       where: { status: "FAILED_ATTEMPT", occurredAt: { gte: start, lt: end }, shipment: { riderId: { not: null } } },
       select: { shipment: { select: { riderId: true } } },
     }),
+    db.review.groupBy({ by: ["riderId"], where: { riderId: { not: null }, riderRating: { not: null }, createdAt: { gte: start, lt: end } }, _avg: { riderRating: true } }),
   ]);
+  const rv = new Map(reviews.map((x) => [x.riderId!, x._avg.riderRating]));
   const del = new Map<string, { n: number; onTime: number }>();
   for (const s of delivered) {
     const e = del.get(s.riderId!) ?? { n: 0, onTime: 0 };
@@ -139,10 +146,21 @@ export async function riderLeaderboards(period: Period): Promise<Board<RiderEntr
     if (!d && !fl) continue;
     const n = d?.n ?? 0;
     const onTimeRate = n ? d!.onTime / n : 0;
-    const score = round1(n * (0.5 + 0.5 * onTimeRate) - 2 * fl);
+    const rating = rv.get(r.id) ?? (r.ratingCount > 0 ? r.rating : null);
+    const score = round1(n * (0.75 * quality(rating ?? NEUTRAL_RATING) + 0.25 * onTimeRate) - 2 * fl);
     const key = r.serviceAreaId ?? "none";
     if (!boards.has(key)) boards.set(key, { categoryKey: key, categoryName: r.serviceArea?.city ?? "Other riders", entries: [] });
-    boards.get(key)!.entries.push({ riderId: r.id, name: r.user.name ?? "Rider", delivered: n, onTimePct: n ? Math.round(onTimeRate * 100) : null, failed: fl, score, qualifies: n >= MIN_DELIVERED, rank: 0 });
+    boards.get(key)!.entries.push({
+      riderId: r.id,
+      name: r.user.name ?? "Rider",
+      delivered: n,
+      onTimePct: n ? Math.round(onTimeRate * 100) : null,
+      rating: rating != null ? round1(rating) : null,
+      failed: fl,
+      score,
+      qualifies: n >= MIN_DELIVERED,
+      rank: 0,
+    });
   }
   return [...boards.values()].map((b) => ({ ...b, entries: rank(b.entries) })).sort((a, b) => a.categoryName.localeCompare(b.categoryName));
 }

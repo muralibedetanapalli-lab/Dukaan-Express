@@ -23,6 +23,8 @@ export function OrderActions({
   cancellable,
   needsPayment,
   canReview,
+  shopName,
+  riderName,
   supportPhone,
 }: {
   orderId: string;
@@ -30,6 +32,9 @@ export function OrderActions({
   cancellable: boolean;
   needsPayment: boolean;
   canReview: boolean;
+  shopName: string;
+  /** Set when a Dukaan rider delivered the order, so the customer can rate them too. */
+  riderName: string | null;
   supportPhone: string;
 }) {
   const router = useRouter();
@@ -129,36 +134,79 @@ export function OrderActions({
           <HelpCircle /> Need help?
         </Button>
       </div>
-      <ReviewDialog open={review} onOpenChange={setReview} orderId={orderId} onDone={() => router.refresh()} />
+      <ReviewDialog open={review} onOpenChange={setReview} orderId={orderId} shopName={shopName} riderName={riderName} onDone={() => router.refresh()} />
       <SupportDialog open={support} onOpenChange={setSupport} orderId={orderId} supportPhone={supportPhone} />
     </>
   );
 }
 
-function ReviewDialog({ open, onOpenChange, orderId, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; orderId: string; onDone: () => void }) {
-  const [rating, setRating] = useState(5);
+const RATING_WORDS = ["", "Very bad", "Bad", "Okay", "Good", "Excellent"];
+
+function StarPicker({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex justify-center gap-1.5" role="radiogroup" aria-label={label}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={n === value} onClick={() => onChange(n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} className="rounded-md p-0.5">
+            <Star className={cn("size-9 transition-colors", n <= value ? "fill-amber-400 text-amber-400" : "text-muted-foreground/50")} />
+          </button>
+        ))}
+      </div>
+      <p className="h-4 text-xs font-medium text-muted-foreground">{RATING_WORDS[value]}</p>
+    </div>
+  );
+}
+
+function ReviewDialog({
+  open,
+  onOpenChange,
+  orderId,
+  shopName,
+  riderName,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  orderId: string;
+  shopName: string;
+  riderName: string | null;
+  onDone: () => void;
+}) {
+  const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [riderRating, setRiderRating] = useState(0);
+  const [riderComment, setRiderComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const missing = rating === 0 || (riderName != null && riderRating === 0);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Rate your order</DialogTitle>
         </DialogHeader>
-        <div className="flex justify-center gap-2">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} onClick={() => setRating(n)} aria-label={`${n} stars`}>
-              <Star className={cn("size-9", n <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
-            </button>
-          ))}
-        </div>
-        <Textarea placeholder="Tell us about your experience (optional)" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} />
+        <section className="space-y-2 rounded-xl border p-4 text-center">
+          <p className="text-sm font-semibold">How was {shopName}?</p>
+          <p className="text-xs text-muted-foreground">Products, packing and freshness</p>
+          <StarPicker value={rating} onChange={setRating} label={`Rate ${shopName}`} />
+          <Textarea placeholder="Anything to tell the shop? (optional)" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={500} />
+        </section>
+        {riderName && (
+          <section className="space-y-2 rounded-xl border p-4 text-center">
+            <p className="text-sm font-semibold">How was the delivery by {riderName}?</p>
+            <p className="text-xs text-muted-foreground">Speed, politeness and care with your order</p>
+            <StarPicker value={riderRating} onChange={setRiderRating} label={`Rate ${riderName}`} />
+            <Textarea placeholder="Anything to tell the rider? (optional)" value={riderComment} onChange={(e) => setRiderComment(e.target.value)} maxLength={300} />
+          </section>
+        )}
+        <p className="text-center text-xs text-muted-foreground">Your ratings help pick each month&apos;s star shop and star rider.</p>
         <Button
-          disabled={busy}
+          disabled={busy || missing}
           onClick={async () => {
             setBusy(true);
             try {
-              await api(`/orders/${orderId}/review`, { body: { rating, comment: comment || null } });
+              await api(`/orders/${orderId}/review`, {
+                body: { rating, comment: comment || null, ...(riderName ? { riderRating, riderComment: riderComment || null } : {}) },
+              });
               toast.success("Thanks for your feedback!");
               onOpenChange(false);
               onDone();

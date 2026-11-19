@@ -132,6 +132,7 @@ export async function RiderDetail({ riderId, viewer, back }: { riderId: string; 
               <Bike className="size-3.5" /> {[rider.vehicleType, rider.vehicleNumber].filter(Boolean).join(" · ") || "—"}
             </span>
           </KeyValue>
+          <KeyValue label="Customer rating">{rider.ratingCount > 0 ? `★ ${rider.rating.toFixed(1)} from ${rider.ratingCount} rating${rider.ratingCount === 1 ? "" : "s"}` : "Not rated yet"}</KeyValue>
           <KeyValue label="Last login">{rider.user.lastLoginAt ? fmtAgo(rider.user.lastLoginAt) : "Never"}</KeyValue>
           <KeyValue label="Last GPS">
             {rider.locationAt && rider.lat != null ? (

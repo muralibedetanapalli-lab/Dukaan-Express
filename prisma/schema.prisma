@@ -871,9 +871,15 @@ model Review {
   shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
   rating     Int
   comment    String?
+  /// The customer's rating of the Dukaan rider who delivered the order (rider deliveries only).
+  riderId       String?
+  rider         Rider?   @relation(fields: [riderId], references: [id], onDelete: SetNull)
+  riderRating   Int?
+  riderComment  String?
   createdAt  DateTime @default(now())
 
   @@index([shopId])
+  @@index([riderId, createdAt])
 }
 
 model SupportTicket {
@@ -1076,10 +1082,14 @@ model Rider {
   lat              Float?
   lng              Float?
   locationAt       DateTime?
+  /// Average customer rating (1–5) and how many ratings it is based on.
+  rating           Float          @default(0)
+  ratingCount      Int            @default(0)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   deliveries  Shipment[]
+  reviews     Review[]
   wallet      RiderWalletEntry[]
   withdrawals RiderWithdrawal[]
   bankAccount RiderBankAccount?
