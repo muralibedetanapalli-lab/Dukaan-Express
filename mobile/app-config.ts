@@ -8,7 +8,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *
  * DUKAAN_URL overrides the server, e.g. `DUKAAN_URL=http://10.0.2.2:3000` for an emulator against `npm run dev`.
  */
-export const DEFAULT_SERVER = "https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io";
+export const DEFAULT_SERVER = "https://dukaan-app.thankfulbay-6d5f36d2.centralindia.azurecontainerapps.io";
 
 export function appConfig(opts: {
   dir: string;

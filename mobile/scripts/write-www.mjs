@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const DEFAULT_SERVER = "https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io";
+const DEFAULT_SERVER = "https://dukaan-app.thankfulbay-6d5f36d2.centralindia.azurecontainerapps.io";
 const role = path.basename(process.cwd()); // customer | shop | rider
 const server = (process.env.DUKAAN_URL ?? DEFAULT_SERVER).replace(/\/$/, "");
 const APPS = {

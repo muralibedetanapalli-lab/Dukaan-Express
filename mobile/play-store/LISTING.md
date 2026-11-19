@@ -14,7 +14,7 @@ Re-render the graphics after design changes with `node scripts/make-store-assets
 **Site links used below.** Replace the domain everywhere if you move to a custom domain. Play lets you edit these URLs at any time.
 
 ```
-BASE = https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io
+BASE = https://dukaan-app.thankfulbay-6d5f36d2.centralindia.azurecontainerapps.io
 Privacy policy:   BASE/legal/privacy
 Delete account:   BASE/legal/delete-account
 Terms:            BASE/legal/terms
@@ -78,7 +78,7 @@ HOW IT WORKS
 SAFE AND PRIVATE
 Your account is protected with a password and a verified email address. Payments are processed securely by Cashfree Payments — we never see your card number or UPI PIN. You can delete your account at any time from the app.
 
-Questions? Write to us from the Help section of any order, or see our policies at https://dukaan-app.bluesky-9c69274d.centralindia.azurecontainerapps.io/legal
+Questions? Write to us from the Help section of any order, or see our policies at https://dukaan-app.thankfulbay-6d5f36d2.centralindia.azurecontainerapps.io/legal
 ```
 
 **Release notes** (first release)
