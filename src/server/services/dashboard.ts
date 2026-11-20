@@ -123,7 +123,8 @@ export async function salesSeries(granularity: Granularity, shopId?: string) {
 
 export async function shopDashboard(shopId: string) {
   const today = startOfDay(new Date());
-  const [byStatus, todayAgg, totalProducts, inventory, recent] = await Promise.all([
+  const fortnightAgo = startOfDay(subDays(new Date(), 14));
+  const [byStatus, todayAgg, totalProducts, inventory, recent, fortnight, bankAccount] = await Promise.all([
     db.order.groupBy({ by: ["status"], where: { shopId }, _count: true }),
     db.order.aggregate({
       where: { shopId, createdAt: { gte: today }, status: { notIn: NOT_SALES } },
@@ -141,10 +142,44 @@ export async function shopDashboard(shopId: string) {
       take: 10,
       include: { items: true },
     }),
+    db.order.findMany({
+      where: { shopId, createdAt: { gte: fortnightAgo }, status: { notIn: NOT_SALES } },
+      select: { createdAt: true, total: true, shopEarning: true },
+    }),
+    db.shopBankAccount.findUnique({ where: { shopId }, select: { id: true } }),
   ]);
   const count = (s: OrderStatus) => byStatus.find((b) => b.status === s)?._count ?? 0;
   const lowStock = inventory.filter((i) => i.stock <= i.lowStockThreshold);
+
+  // Last 7 days (India time) for the mini chart, plus the 7 days before for comparison.
+  const istDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d);
+  const days = Array.from({ length: 14 }, (_, i) => istDay(subDays(new Date(), 13 - i)));
+  const byDay = new Map(days.map((d) => [d, { sales: 0, orders: 0 }]));
+  for (const o of fortnight) {
+    const b = byDay.get(istDay(o.createdAt));
+    if (b) {
+      b.sales += o.total;
+      b.orders += 1;
+    }
+  }
+  const series = days.map((d) => ({ day: d, ...byDay.get(d)! }));
+  const week = series.slice(7);
+  const weekSales = week.reduce((a, d) => a + d.sales, 0);
+  const prevWeekSales = series.slice(0, 7).reduce((a, d) => a + d.sales, 0);
+
   return {
+    week,
+    weekSales,
+    weekOrders: week.reduce((a, d) => a + d.orders, 0),
+    prevWeekSales,
+    // Stock health: every product falls in exactly one group.
+    stock: (() => {
+      const out = inventory.filter((i) => i.stock === 0 || !i.isAvailable).length;
+      const low = inventory.filter((i) => i.isAvailable && i.stock > 0 && i.stock <= i.lowStockThreshold).length;
+      return { out, low, healthy: inventory.length - out - low };
+    })(),
+    hasBankAccount: !!bankAccount,
+    totalOrders: byStatus.reduce((a, b) => a + b._count, 0),
     todayOrders: todayAgg._count,
     todayRevenue: todayAgg._sum.total ?? 0,
     todayEarning: todayAgg._sum.shopEarning ?? 0,
