@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import { getSessionUser } from "@/server/auth/session";
 import { activeShopFor, listInventory } from "@/server/services/inventory";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,18 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         title="Inventory"
         description="Prices and stock are specific to your shop."
         actions={
-          <Button asChild>
-            <Link href="/shop/inventory/new">
-              <Plus /> Add product
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href="/shop/inventory/import">
+                <FileSpreadsheet /> Excel upload
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/shop/inventory/new">
+                <Plus /> Add product
+              </Link>
+            </Button>
+          </div>
         }
       />
       <InventoryList
@@ -48,6 +55,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           low: i.stock <= i.lowStockThreshold,
           isAvailable: i.isAvailable,
           approval: i.product.approvalStatus,
+          editable: i.product.createdByShopId === shop.id,
         }))}
       />
       <Pagination page={res.page} pageSize={res.pageSize} total={res.total} basePath="/shop/inventory" params={{ filter, q: sp.q }} />

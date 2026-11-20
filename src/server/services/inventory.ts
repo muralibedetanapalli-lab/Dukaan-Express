@@ -9,6 +9,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getSettings } from "./settings";
 import { audit } from "./audit";
 import { notifyAdmins } from "./notification";
+import { productArtUrl } from "@/lib/product-art";
 
 export const ACTIVE_SHOP_COOKIE = "dx_shop";
 
@@ -66,7 +67,7 @@ async function uniqueSlug(name: string) {
   return slug;
 }
 
-export async function createInventory(shopId: string, actor: SessionUser, input: InventoryInput) {
+export async function createInventory(shopId: string, actor: SessionUser, input: InventoryInput, opts: { notify?: boolean } = {}) {
   if (input.sellingPrice > input.mrp) throw badRequest("Selling price cannot exceed MRP");
   const settings = await getSettings();
   let productId = input.productId ?? null;
@@ -98,11 +99,12 @@ export async function createInventory(shopId: string, actor: SessionUser, input:
         heightCm: p.heightCm,
         createdByShopId: shopId,
         approvalStatus: settings.approvals.productApprovalRequired ? "PENDING" : "APPROVED",
-        images: { create: p.images.map((url, i) => ({ url, sortOrder: i })) },
+        // No photo yet: generate a catalogue-style icon; the shop can replace it with a real photo any time.
+        images: { create: (p.images.length ? p.images : [productArtUrl(p.name, cat.name)]).map((url, i) => ({ url, alt: p.name, sortOrder: i })) },
       },
     });
     productId = created.id;
-    if (created.approvalStatus === "PENDING") {
+    if (created.approvalStatus === "PENDING" && opts.notify !== false) {
       await notifyAdmins({ type: "SHOP", title: "Product awaiting approval", body: created.name, link: "/admin/products?approval=PENDING" });
     }
   } else {

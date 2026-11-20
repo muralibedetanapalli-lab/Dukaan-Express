@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { Camera, ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, errorMessage } from "@/lib/api-client";
+import { errorMessage } from "@/lib/api-client";
+import { isGeneratedArt } from "@/lib/product-art";
+import { uploadPhoto } from "@/components/shared/photo-picker";
 import { cn } from "@/lib/utils";
 
 /** Multi-image uploader backed by POST /api/v1/uploads. Value is the ordered list of URLs. */
@@ -21,19 +23,17 @@ export function ImageUploader({
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
-    const next = [...value];
+    // A real photo replaces the auto-generated icon rather than sitting behind it.
+    const next = value.filter((u) => !isGeneratedArt(u));
     try {
-      for (const f of Array.from(files).slice(0, max - value.length)) {
-        const fd = new FormData();
-        fd.set("file", f);
-        fd.set("folder", folder);
-        const r = await api<{ url: string }>("/uploads", { body: fd });
-        next.push(r.url);
+      for (const f of Array.from(files).slice(0, max - next.length)) {
+        next.push(await uploadPhoto(f, folder));
       }
       onChange(next);
     } catch (e) {
@@ -42,6 +42,7 @@ export function ImageUploader({
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
+      if (camera.current) camera.current.value = "";
     }
   }
 
@@ -51,7 +52,9 @@ export function ImageUploader({
         <div key={url} className="group relative size-20 overflow-hidden rounded-xl border bg-muted">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={url} alt="" className="size-full object-cover" />
-          {i === 0 && <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-center text-[10px] text-white">Cover</span>}
+          {i === 0 && (
+            <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-center text-[10px] text-white">{isGeneratedArt(url) ? "Auto icon" : "Cover"}</span>
+          )}
           <button
             type="button"
             onClick={() => onChange(value.filter((u) => u !== url))}
@@ -62,16 +65,27 @@ export function ImageUploader({
           </button>
         </div>
       ))}
-      {value.length < max && (
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          disabled={busy}
-          className="grid size-20 place-items-center rounded-xl border-2 border-dashed text-muted-foreground transition hover:border-primary hover:text-primary"
-        >
-          {busy ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-        </button>
+      {value.filter((u) => !isGeneratedArt(u)).length < max && (
+        <>
+          <button
+            type="button"
+            onClick={() => camera.current?.click()}
+            disabled={busy}
+            className="flex size-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition hover:border-primary hover:text-primary"
+          >
+            {busy ? <Loader2 className="size-5 animate-spin" /> : <Camera className="size-5" />} Take photo
+          </button>
+          <button
+            type="button"
+            onClick={() => input.current?.click()}
+            disabled={busy}
+            className="flex size-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition hover:border-primary hover:text-primary"
+          >
+            {busy ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />} Upload
+          </button>
+        </>
       )}
+      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => upload(e.target.files)} />
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple={max > 1} hidden onChange={(e) => upload(e.target.files)} />
     </div>
   );

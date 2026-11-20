@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { EmptyState, ProductThumb } from "@/components/shared/misc";
+import { EmptyState } from "@/components/shared/misc";
+import { ProductPhotoChanger } from "@/components/shared/photo-picker";
 import { Pill } from "@/components/shared/status-badge";
 import { api, errorMessage } from "@/lib/api-client";
 import { formatINR } from "@/lib/money";
@@ -27,6 +28,7 @@ interface Row {
   low: boolean;
   isAvailable: boolean;
   approval: string;
+  editable: boolean;
 }
 
 const FILTERS = [
@@ -96,7 +98,7 @@ export function InventoryList({ items, filter, q }: { items: Row[]; filter: stri
         <Card className="divide-y gap-0 p-0">
           {rows.map((r) => (
             <div key={r.id} className={cn("flex items-center gap-3 p-3", !r.isAvailable && "opacity-60")}>
-              <ProductThumb src={r.imageUrl} alt={r.name} className="size-12 shrink-0" />
+              <ProductPhotoChanger inventoryId={r.id} src={r.imageUrl} alt={r.name} editable={r.editable} className="size-12" />
               <Link href={`/shop/inventory/${r.id}`} className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">
                   {r.name}
