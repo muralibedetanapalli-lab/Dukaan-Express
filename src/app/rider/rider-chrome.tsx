@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bike, LogOut, MapPinOff, Wallet } from "lucide-react";
@@ -16,6 +16,10 @@ const NAV = [
   { href: "/rider/wallet", label: "Wallet", icon: Wallet },
 ];
 const SEND_EVERY_MS = 15_000;
+
+/** Lets pages show their own Online / Offline control that stays in sync with the header switch. */
+const OnlineContext = createContext<{ online: boolean; toggle: (v: boolean) => Promise<void> } | null>(null);
+export const useRiderOnline = () => useContext(OnlineContext);
 
 /**
  * Rider shell: online switch, bottom navigation, job alerts, and live location sharing.
@@ -140,7 +144,9 @@ export function RiderChrome({
           </p>
         )}
       </header>
-      <main className="mx-auto max-w-xl px-4 pt-4 pb-24">{children}</main>
+      <main className="mx-auto max-w-xl px-4 pt-4 pb-24">
+        <OnlineContext.Provider value={{ online, toggle }}>{children}</OnlineContext.Provider>
+      </main>
       {approved && <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-2">
           {NAV.map((n) => (
