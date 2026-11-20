@@ -36,6 +36,15 @@ describe("pricing engine", () => {
     expect(q.deliveryFee).toBe(0);
   });
 
+  it("charges no delivery fee when the shop books delivery itself (Rapido, Ola…)", () => {
+    const q = computeQuote([{ mrp: 20000, price: 20000, quantity: 1, taxRateBps: 500 }], cfg(), { distanceKm: 6, noDeliveryFee: true });
+    expect(q.deliveryFee).toBe(0);
+    expect(q.total).toBe(20000);
+    expect(q.amountToFreeDelivery).toBe(0);
+    // The shop's earning is unchanged: delivery is paid by the shop outside the platform.
+    expect(q.shopEarning).toBe(20000 - q.commissionAmount);
+  });
+
   it("adds tax on top when prices are tax-exclusive", () => {
     const q = computeQuote([{ mrp: 10000, price: 10000, quantity: 1, taxRateBps: 1800 }], cfg({ tax: { enabled: true, pricesInclusive: false, deliveryFeeTaxBps: 0 } }), { distanceKm: 1 });
     expect(q.taxAmount).toBe(1800);

@@ -9,6 +9,7 @@ import { slugify } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import { audit } from "./audit";
 import { notifyShop, notifyUsers } from "./notification";
+import { DELIVERY_MODES } from "@/lib/delivery-mode";
 
 const actorOf = (u: SessionUser) => ({ id: u.id, role: u.role });
 
@@ -46,7 +47,7 @@ export const zShopInput = z.object({
   deliveryRadiusKm: z.number().min(0.5).max(50),
   commissionBps: z.number().int().min(0).max(5000).optional().nullable(),
   avgPrepMinutes: z.number().int().min(1).max(120).default(10),
-  deliveryMode: z.enum(["OWN", "RIDER"]).optional(),
+  deliveryMode: z.enum(DELIVERY_MODES).optional(),
   address: z.object({
     line1: z.string().trim().min(3).max(200),
     line2: z.string().trim().max(200).optional().nullable(),

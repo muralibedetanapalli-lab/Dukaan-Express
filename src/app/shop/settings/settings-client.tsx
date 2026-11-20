@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { KeyValue } from "@/components/shared/misc";
 import { api, errorMessage } from "@/lib/api-client";
 import { DeliveryModeCard } from "./delivery-mode";
+import type { DeliveryModeKey } from "@/lib/delivery-mode";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
@@ -20,7 +21,7 @@ type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed:
 export function ShopSettingsClient({
   shop,
 }: {
-  shop: { name: string; avgPrepMinutes: number; deliveryRadiusKm: number; address: string; hours: Hours[]; deliveryMode: "OWN" | "RIDER" };
+  shop: { name: string; avgPrepMinutes: number; deliveryRadiusKm: number; address: string; hours: Hours[]; deliveryMode: DeliveryModeKey };
 }) {
   const router = useRouter();
   const [hours, setHours] = useState<Hours[]>(() => DAYS.map((_, d) => shop.hours.find((h) => h.dayOfWeek === d) ?? { dayOfWeek: d, openTime: "08:00", closeTime: "22:00", isClosed: false }));

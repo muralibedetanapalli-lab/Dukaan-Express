@@ -2,6 +2,7 @@ import { z } from "zod";
 import { api, paginate } from "@/server/http";
 import { db } from "@/server/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { DELIVERY_MODES } from "@/lib/delivery-mode";
 
 /** Deliveries (own staff or rider), newest activity first. */
 export const GET = api(
@@ -9,7 +10,7 @@ export const GET = api(
     roles: ["SUPER_ADMIN"],
     query: z.object({
       status: z.enum(["PENDING", "CREATED", "COURIER_ASSIGNED", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED_ATTEMPT", "CANCELLED"]).optional(),
-      mode: z.enum(["OWN", "RIDER"]).optional(),
+      mode: z.enum(DELIVERY_MODES).optional(),
       q: z.string().max(40).optional(),
       page: z.coerce.number().int().min(1).default(1),
       pageSize: z.coerce.number().int().min(1).max(100).default(25),

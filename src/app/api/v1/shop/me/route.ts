@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { notFound } from "@/server/errors";
 import { ACTIVE_SHOP_COOKIE, activeShopFor } from "@/server/services/inventory";
 import { audit } from "@/server/services/audit";
+import { DELIVERY_MODES } from "@/lib/delivery-mode";
 
 export const GET = api({ roles: ["SHOP_OWNER"] }, async ({ user }) => {
   const { shop, shops } = await activeShopFor(user);
@@ -21,7 +22,7 @@ export const PATCH = api(
       switchToShopId: z.string().optional(),
       acceptingOrders: z.boolean().optional(),
       avgPrepMinutes: z.number().int().min(1).max(120).optional(),
-      deliveryMode: z.enum(["OWN", "RIDER"]).optional(),
+      deliveryMode: z.enum(DELIVERY_MODES).optional(),
       hours: z
         .array(z.object({ dayOfWeek: z.number().int().min(0).max(6), openTime: hhmm, closeTime: hhmm, isClosed: z.boolean() }))
         .max(7)

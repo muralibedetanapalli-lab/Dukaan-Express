@@ -61,7 +61,13 @@ export function couponDiscountFor(subtotal: number, coupon: CouponRule, maxPerce
 export function computeQuote(
   lines: PriceLine[],
   cfg: PricingConfig,
-  opts: { distanceKm: number; coupon?: CouponRule | null; couponError?: string | null },
+  opts: {
+    distanceKm: number;
+    coupon?: CouponRule | null;
+    couponError?: string | null;
+    /** The shop books and pays for delivery itself (Rapido, Ola…), so the customer is never charged for it. */
+    noDeliveryFee?: boolean;
+  },
 ): Quote {
   const itemsMrpTotal = lines.reduce((s, l) => s + l.mrp * l.quantity, 0);
   const subtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
@@ -79,7 +85,7 @@ export function computeQuote(
 
   const afterCoupon = subtotal - couponDiscount;
   const deliveryFee =
-    lines.length === 0 || afterCoupon >= cfg.delivery.freeDeliveryThreshold
+    lines.length === 0 || opts.noDeliveryFee || afterCoupon >= cfg.delivery.freeDeliveryThreshold
       ? 0
       : deliveryFeeFor(opts.distanceKm, cfg.delivery);
 
@@ -119,7 +125,7 @@ export function computeQuote(
     total,
     minOrderAmount: cfg.order.minOrderAmount,
     meetsMinimum: subtotal >= cfg.order.minOrderAmount,
-    amountToFreeDelivery: Math.max(0, cfg.delivery.freeDeliveryThreshold - afterCoupon),
+    amountToFreeDelivery: opts.noDeliveryFee ? 0 : Math.max(0, cfg.delivery.freeDeliveryThreshold - afterCoupon),
     lineTaxes,
     commissionBps: cfg.commissionBps,
     commissionAmount,

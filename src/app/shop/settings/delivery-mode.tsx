@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bike, Loader2, Store } from "lucide-react";
+import { Bike, Loader2, Smartphone, Store } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { api, errorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import type { DeliveryModeKey } from "@/lib/delivery-mode";
 
 const OPTIONS = [
   {
@@ -21,21 +22,33 @@ const OPTIONS = [
     title: "My own delivery staff",
     body: "You deliver orders yourself and keep the delivery fee. On cash orders you keep the cash; the platform commission is taken from your earnings.",
   },
+  {
+    value: "SELF_BOOKED" as const,
+    icon: Smartphone,
+    title: "I book Rapido / Ola",
+    body: "You book a delivery app (Rapido, Ola, Porter…) for each order and pay for it. Customers pay no delivery fee. You confirm the handover with the customer's code.",
+  },
 ];
 
+const CHOSEN: Record<DeliveryModeKey, string> = {
+  RIDER: "Dukaan Express riders will deliver your orders",
+  OWN: "You'll deliver orders with your own staff",
+  SELF_BOOKED: "You'll book Rapido / Ola for your orders; customers pay no delivery fee",
+};
+
 /** How this shop's orders are delivered (applies to orders packed after the change). */
-export function DeliveryModeCard({ mode }: { mode: "OWN" | "RIDER" }) {
+export function DeliveryModeCard({ mode }: { mode: DeliveryModeKey }) {
   const router = useRouter();
   const [value, setValue] = useState(mode);
   const [busy, setBusy] = useState(false);
 
-  async function choose(next: "OWN" | "RIDER") {
+  async function choose(next: DeliveryModeKey) {
     if (next === value || busy) return;
     setBusy(true);
     try {
       await api("/shop/me", { method: "PATCH", body: { deliveryMode: next } });
       setValue(next);
-      toast.success(next === "OWN" ? "You'll deliver orders with your own staff" : "Dukaan Express riders will deliver your orders");
+      toast.success(CHOSEN[next]);
       router.refresh();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -50,9 +63,9 @@ export function DeliveryModeCard({ mode }: { mode: "OWN" | "RIDER" }) {
         <p className="flex items-center gap-2 font-semibold">
           Delivery {busy && <Loader2 className="size-4 animate-spin" />}
         </p>
-        <p className="text-xs text-muted-foreground">Applies to orders you pack from now on.</p>
+        <p className="text-xs text-muted-foreground">Applies to orders you pack from now on. The delivery fee change applies to new orders.</p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Delivery mode">
+      <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Delivery mode">
         {OPTIONS.map((o) => (
           <button
             key={o.value}

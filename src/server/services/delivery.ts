@@ -9,6 +9,7 @@ import type { OrderStatusKey } from "@/lib/order-status";
 import { audit } from "./audit";
 import { afterTransition, transitionOrder, SYSTEM, type OrderActor } from "./order";
 import { deliveryFeeFor } from "./pricing";
+import { shopDelivers } from "@/lib/delivery-mode";
 import { riderStar } from "./badges";
 import { getSettings } from "./settings";
 import { adminUserIds, customerUserId, notifyAdmins, notifyCustomer, notifyShop, notifyUsers, shopOwnerUserIds, signalUsers } from "./notification";
@@ -22,6 +23,8 @@ import { adminUserIds, customerUserId, notifyAdmins, notifyCustomer, notifyShop,
  *         The rider earns the delivery fee (distance based, paid even when the customer got free delivery);
  *         cash collected on COD orders is deducted from the rider's wallet.
  *  OWN:   the shop dispatches and completes the delivery itself (same handover code) and keeps the delivery fee.
+ *  SELF_BOOKED: like OWN, but the shop books a delivery app (Rapido, Ola, Porter…) and pays for it, so the
+ *         customer is charged no delivery fee.
  */
 
 const ACTIVE_RIDER_STATUSES = ["COURIER_ASSIGNED", "OUT_FOR_DELIVERY"] as const;
@@ -80,7 +83,7 @@ export async function startDelivery(orderId: string, actor: OrderActor) {
     create: { orderId, ...data, deliveryCode: newDeliveryCode() },
     update: data,
   });
-  await addEvent(shipment.id, mode === "RIDER" ? "CREATED" : "PENDING", mode === "RIDER" ? "Looking for a rider" : "Shop will deliver with its own staff");
+  await addEvent(shipment.id, mode === "RIDER" ? "CREATED" : "PENDING", mode === "RIDER" ? "Looking for a rider" : mode === "SELF_BOOKED" ? "Shop will book a delivery partner" : "Shop will deliver with its own staff");
   if (mode === "RIDER") {
     await transitionOrder(orderId, "SHIPMENT_CREATED", SYSTEM, { remarks: "Looking for a rider", silent: true });
     await offerToRiders(shipment.id);
@@ -243,7 +246,7 @@ async function shopOrder(user: SessionUser, orderId: string) {
 export async function dispatchOwn(user: SessionUser, orderId: string) {
   const order = await shopOrder(user, orderId);
   const status = order.status as OrderStatusKey;
-  if (status === "DELIVERY_FAILED" && order.shipment?.mode === "OWN") {
+  if (status === "DELIVERY_FAILED" && shopDelivers(order.shipment?.mode)) {
     await transitionOrder(orderId, "OUT_FOR_DELIVERY", { id: user.id, role: user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "SHOP_OWNER", shopOwnerId: user.shopOwnerId }, { remarks: "Retrying delivery" });
     return;
   }
@@ -252,15 +255,17 @@ export async function dispatchOwn(user: SessionUser, orderId: string) {
     const r = await db.shipment.updateMany({ where: { orderId, status: "CREATED", riderId: null }, data: { mode: "OWN", status: "OUT_FOR_DELIVERY", riderFee: 0, pickedUpAt: new Date() } });
     if (r.count !== 1) throw conflict("A rider just accepted this delivery");
   } else {
+    const mode = order.shop.deliveryMode === "SELF_BOOKED" ? ("SELF_BOOKED" as const) : ("OWN" as const);
     await db.shipment.upsert({
       where: { orderId },
-      create: { orderId, mode: "OWN", status: "OUT_FOR_DELIVERY", deliveryCode: newDeliveryCode(), codAmount: order.paymentMethod === "COD" ? order.total : 0, pickedUpAt: new Date() },
-      update: { mode: "OWN", status: "OUT_FOR_DELIVERY", riderId: null, riderFee: 0, pickedUpAt: new Date() },
+      create: { orderId, mode, status: "OUT_FOR_DELIVERY", deliveryCode: newDeliveryCode(), codAmount: order.paymentMethod === "COD" ? order.total : 0, pickedUpAt: new Date() },
+      update: { mode, status: "OUT_FOR_DELIVERY", riderId: null, riderFee: 0, pickedUpAt: new Date() },
     });
   }
   const s = await db.shipment.findUniqueOrThrow({ where: { orderId } });
-  await addEvent(s.id, "OUT_FOR_DELIVERY", "Out for delivery with the shop's own staff");
-  await transitionOrder(orderId, "OUT_FOR_DELIVERY", { id: user.id, role: user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "SHOP_OWNER", shopOwnerId: user.shopOwnerId }, { remarks: "Shop's own delivery" });
+  const booked = s.mode === "SELF_BOOKED";
+  await addEvent(s.id, "OUT_FOR_DELIVERY", booked ? "Out for delivery with a partner booked by the shop" : "Out for delivery with the shop's own staff");
+  await transitionOrder(orderId, "OUT_FOR_DELIVERY", { id: user.id, role: user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "SHOP_OWNER", shopOwnerId: user.shopOwnerId }, { remarks: booked ? "Delivery partner booked by the shop" : "Shop's own delivery" });
   await notifyDeliveryParties(orderId);
 }
 
@@ -327,7 +332,7 @@ function deliveryActor(user: SessionUser, order: { shop: { ownerId: string | nul
   }
   if (user.role === "SHOP_OWNER") {
     if (order.shop.ownerId !== user.shopOwnerId) throw notFound("Order");
-    if (s.mode !== "OWN") throw forbidden("A Dukaan Express rider is delivering this order");
+    if (!shopDelivers(s.mode)) throw forbidden("A Dukaan Express rider is delivering this order");
     return { id: user.id, role: "SHOP_OWNER", shopOwnerId: user.shopOwnerId };
   }
   throw forbidden();
@@ -408,7 +413,7 @@ export async function trackingFor(order: { id: string; status: string; deliveryL
     mode: s.mode,
     status: s.status,
     deliveryCode: showCode ? s.deliveryCode : null,
-    shop: { name: s.order.shop.name, phone: s.mode === "OWN" ? s.order.shop.contactPhone : null, lat: s.order.shop.address?.latitude ?? null, lng: s.order.shop.address?.longitude ?? null },
+    shop: { name: s.order.shop.name, phone: shopDelivers(s.mode) ? s.order.shop.contactPhone : null, lat: s.order.shop.address?.latitude ?? null, lng: s.order.shop.address?.longitude ?? null },
     drop: { lat: order.deliveryLat, lng: order.deliveryLng },
     rider: live
       ? {

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageUploader } from "@/components/shared/image-uploader";
 import { api, errorMessage } from "@/lib/api-client";
+import type { DeliveryModeKey } from "@/lib/delivery-mode";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -30,7 +31,7 @@ export interface ShopFormValue {
   deliveryRadiusKm: string;
   commissionPercent: string; // blank → platform default
   avgPrepMinutes: string;
-  deliveryMode: "OWN" | "RIDER";
+  deliveryMode: DeliveryModeKey;
   address: { line1: string; line2: string; landmark: string; city: string; state: string; pincode: string; latitude: string; longitude: string };
   hours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
 }
@@ -266,15 +267,19 @@ export function ShopForm({
             </F>
           )}
           <F label="Delivery by">
-            <Select value={v.deliveryMode} onValueChange={(x) => set("deliveryMode", x as "OWN" | "RIDER")}>
+            <Select value={v.deliveryMode} onValueChange={(x) => set("deliveryMode", x as DeliveryModeKey)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="RIDER">Dukaan Express rider</SelectItem>
                 <SelectItem value="OWN">Shop&apos;s own staff</SelectItem>
+                <SelectItem value="SELF_BOOKED">Shop books Rapido / Ola (no delivery charge)</SelectItem>
               </SelectContent>
             </Select>
+            {v.deliveryMode === "SELF_BOOKED" && (
+              <p className="mt-1 text-xs text-muted-foreground">Customers pay no delivery fee. The shop books and pays for Rapido, Ola, Porter etc. itself.</p>
+            )}
           </F>
           <F label="Avg. prep time (min)">
             <Input value={v.avgPrepMinutes} onChange={(e) => set("avgPrepMinutes", e.target.value)} inputMode="numeric" />

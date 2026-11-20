@@ -6,6 +6,7 @@ import { STATUS_META, type OrderStatusKey } from "@/lib/order-status";
 import { applyBps, formatINR } from "@/lib/money";
 import type { Prisma, PaymentMethod } from "@/generated/prisma/client";
 import { canTransition, STOCK_RESERVED_STATUSES, type ActorRole } from "./order-state";
+import { noDeliveryFee, shopDelivers } from "@/lib/delivery-mode";
 import { computeQuote } from "./pricing";
 import { pricingConfig } from "./cart";
 import { checkCoupon } from "./coupon";
@@ -103,6 +104,7 @@ export async function placeOrder(customer: { userId: string; customerId: string 
   const quote = computeQuote(lines, pricingConfig(settings, shop.commissionBps), {
     distanceKm: reach.distanceKm,
     coupon: coupon?.rule ?? null,
+    noDeliveryFee: noDeliveryFee(shop.deliveryMode),
   });
   if (!quote.meetsMinimum) throw unprocessableOrder("MIN_ORDER", `Minimum order value is ${formatINR(quote.minOrderAmount)}`);
   if (isCod && quote.total > settings.payments.codMaxAmount)
@@ -347,10 +349,10 @@ export async function transitionOrder(orderId: string, to: OrderStatusKey, actor
       }
       // The shop's regional dealer (if any) earns a share of the platform commission, fixed at delivery.
       const dealer = (await tx.shop.findUnique({ where: { id: order.shopId }, select: { dealer: { select: { id: true, commissionShareBps: true } } } }))?.dealer;
-      // Own delivery: the shop keeps the delivery fee; on cash orders it also already holds the customer's cash,
+      // Own / self-booked delivery: the shop keeps the delivery fee (zero when self-booked); on cash orders it also already holds the customer's cash,
       // so that cash is netted off its earnings (the platform's commission then comes out of the shop balance).
       const mode = (await tx.shipment.findUnique({ where: { orderId }, select: { mode: true } }))?.mode;
-      const shopEarning = mode === "OWN" ? order.shopEarning + order.deliveryFee - (order.paymentMethod === "COD" ? order.total : 0) : order.shopEarning;
+      const shopEarning = shopDelivers(mode) ? order.shopEarning + order.deliveryFee - (order.paymentMethod === "COD" ? order.total : 0) : order.shopEarning;
       await tx.commission.upsert({
         where: { orderId },
         create: {

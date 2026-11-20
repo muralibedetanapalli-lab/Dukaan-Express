@@ -11,7 +11,7 @@ import { api } from "@/lib/api-client";
 import { fmtAgo } from "@/lib/format";
 
 export interface Tracking {
-  mode: "OWN" | "RIDER";
+  mode: "OWN" | "RIDER" | "SELF_BOOKED";
   status: string;
   deliveryCode: string | null;
   shop: { name: string; phone: string | null; lat: number | null; lng: number | null };
@@ -148,10 +148,10 @@ export function LiveTracking({ orderId, initialStatus, initial }: { orderId: str
         </div>
       )}
 
-      {t.mode === "OWN" && live && (
+      {t.mode !== "RIDER" && live && (
         <div className="flex items-center justify-between gap-3 px-5">
           <p className="flex items-center gap-2 text-sm">
-            <Store className="size-4 text-primary" /> {t.shop.name} is delivering this order with its own staff.
+            <Store className="size-4 text-primary" /> {t.mode === "SELF_BOOKED" ? `${t.shop.name} has booked a delivery partner for this order.` : `${t.shop.name} is delivering this order with its own staff.`}
           </p>
           {t.shop.phone && (
             <Button asChild size="sm" variant="outline">

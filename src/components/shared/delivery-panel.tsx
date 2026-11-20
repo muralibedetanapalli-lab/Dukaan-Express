@@ -16,9 +16,10 @@ import { api, errorMessage } from "@/lib/api-client";
 import { formatINR } from "@/lib/money";
 import { fmtDateTime } from "@/lib/format";
 import { DELIVERY_MODE_LABEL, SHIPMENT_STATUS_LABEL } from "@/lib/order-status";
+import { shopDelivers, type DeliveryModeKey } from "@/lib/delivery-mode";
 
 export interface DeliveryInfo {
-  mode: "OWN" | "RIDER";
+  mode: DeliveryModeKey;
   status: string;
   riderFee: number;
   codAmount: number;
@@ -42,7 +43,7 @@ export function DeliveryPanel({
   orderId: string;
   role: "shop" | "admin";
   orderStatus: string;
-  shopMode: "OWN" | "RIDER";
+  shopMode: DeliveryModeKey;
   delivery: DeliveryInfo | null;
   riders?: { id: string; name: string; detail: string }[];
 }) {
@@ -71,7 +72,8 @@ export function DeliveryPanel({
   };
 
   const mode = delivery?.mode ?? shopMode;
-  const own = mode === "OWN";
+  const own = shopDelivers(mode);
+  const booked = mode === "SELF_BOOKED";
   const searching = orderStatus === "SHIPMENT_CREATED";
   const outForDelivery = orderStatus === "OUT_FOR_DELIVERY";
   const canDeliverOwn = (orderStatus === "PACKED" && (own || !delivery)) || searching || (orderStatus === "DELIVERY_FAILED" && own);
@@ -94,7 +96,9 @@ export function DeliveryPanel({
 
       {preDispatch && (
         <p className="text-sm text-muted-foreground">
-          {own ? "Your own staff delivers this order. You'll send it out once it's packed." : "When you mark the order packed, nearby Dukaan Express riders are alerted to pick it up."}
+          {booked
+            ? "Book Rapido, Ola or Porter for this order once it's packed, then mark it out for delivery. The customer paid no delivery fee."
+            : own ? "Your own staff delivers this order. You'll send it out once it's packed." : "When you mark the order packed, nearby Dukaan Express riders are alerted to pick it up."}
         </p>
       )}
 
@@ -168,7 +172,9 @@ export function DeliveryPanel({
             description={
               searching
                 ? "Stop looking for a rider and deliver with your own staff. You keep the delivery fee. Ask the customer for their 4-digit code on delivery."
-                : "Your delivery person takes the order now. Ask the customer for their 4-digit code when you hand it over."
+                : booked
+                  ? "Hand the order to the Rapido / Ola partner you booked. Ask the customer for their 4-digit code on delivery (or have the partner call you with it)."
+                  : "Your delivery person takes the order now. Ask the customer for their 4-digit code when you hand it over."
             }
             confirmLabel="Out for delivery"
             onConfirm={() => call("own", { action: "deliver_own" }, "Out for delivery")}

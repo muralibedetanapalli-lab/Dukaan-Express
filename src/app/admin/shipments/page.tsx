@@ -21,7 +21,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
   const pageSize = 25;
   const where: Prisma.ShipmentWhereInput = {
     ...(sp.status ? { status: sp.status as Prisma.ShipmentWhereInput["status"] & string } : {}),
-    ...(sp.mode === "OWN" || sp.mode === "RIDER" ? { mode: sp.mode } : {}),
+    ...(sp.mode === "OWN" || sp.mode === "RIDER" || sp.mode === "SELF_BOOKED" ? { mode: sp.mode } : {}),
     ...(sp.failed === "true" ? { failedDeliveryCount: { gt: 0 } } : {}),
     ...(sp.q ? { order: { orderNumber: { contains: sp.q.toUpperCase() } } } : {}),
   };
@@ -92,7 +92,7 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
                 </TableCell>
                 <TableCell className="text-sm">{s.order.shop.name}</TableCell>
                 <TableCell className="text-sm">
-                  {s.mode === "OWN" ? "Shop staff" : s.rider ? s.rider.user.name : s.status === "CREATED" ? <span className="text-amber-700">No rider yet</span> : <span className="text-muted-foreground">—</span>}
+                  {s.mode === "OWN" ? "Shop staff" : s.mode === "SELF_BOOKED" ? "Booked by shop" : s.rider ? s.rider.user.name : s.status === "CREATED" ? <span className="text-amber-700">No rider yet</span> : <span className="text-muted-foreground">—</span>}
                   {s.rider?.user.phone && <p className="text-xs text-muted-foreground">{s.rider.user.phone}</p>}
                 </TableCell>
                 <TableCell>

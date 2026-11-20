@@ -17,7 +17,7 @@ const ACTION: Record<string, { action: string; icon: typeof CheckCircle2; confir
   SHOP_ACCEPTED: { action: "accept", icon: CheckCircle2 },
   PREPARING: { action: "start_preparing", icon: ChefHat },
   READY_FOR_PACKING: { action: "ready_for_packing", icon: PackageOpen },
-  PACKED: { action: "packed", icon: PackageCheck, confirm: "Confirm all items are packed. The order then goes out for delivery — with a Dukaan Express rider or your own staff, per your delivery setting." },
+  PACKED: { action: "packed", icon: PackageCheck, confirm: "Confirm all items are packed. The order then goes out for delivery — with a Dukaan Express rider, your own staff, or a Rapido / Ola you book, per your delivery setting." },
 };
 
 export function ShopOrderActions({

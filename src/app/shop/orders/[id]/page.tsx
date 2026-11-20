@@ -91,7 +91,7 @@ export default async function ShopOrderPage({ params }: { params: Promise<{ id: 
             </KeyValue>
             {order.paymentMethod === "COD" && (
               <Pill tone="warning" className="mt-2">
-                Cash on delivery {formatINR(order.total)} · {(order.shipment?.mode ?? order.shop.deliveryMode) === "OWN" ? "your staff collects it" : "the rider collects it"}
+                Cash on delivery {formatINR(order.total)} · {(order.shipment?.mode ?? order.shop.deliveryMode) === "RIDER" ? "the rider collects it" : "you collect it"}
               </Pill>
             )}
           </Card>

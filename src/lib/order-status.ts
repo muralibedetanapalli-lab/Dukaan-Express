@@ -85,4 +85,4 @@ export const SHIPMENT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
-export const DELIVERY_MODE_LABEL: Record<string, string> = { OWN: "Shop's own delivery", RIDER: "Dukaan Express rider" };
+export const DELIVERY_MODE_LABEL: Record<string, string> = { OWN: "Shop's own delivery", RIDER: "Dukaan Express rider", SELF_BOOKED: "Booked by shop (Rapido / Ola)" };

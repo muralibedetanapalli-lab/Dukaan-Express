@@ -4,6 +4,7 @@ import { badRequest, conflict, notFound } from "@/server/errors";
 import type { LatLng } from "@/lib/geo";
 import { unitLabel } from "@/lib/format";
 import { checkCoupon } from "./coupon";
+import { noDeliveryFee } from "@/lib/delivery-mode";
 import { computeQuote, type PricingConfig, type Quote } from "./pricing";
 import { eligibleShops } from "./location";
 import { getSettings, type PlatformSettings } from "./settings";
@@ -113,6 +114,7 @@ export async function getCartView(customerId: string, point: LatLng | null): Pro
     distanceKm: reach?.distanceKm ?? 2,
     coupon,
     couponError,
+    noDeliveryFee: noDeliveryFee(shopRow?.deliveryMode),
   });
 
   const blockers: string[] = [];

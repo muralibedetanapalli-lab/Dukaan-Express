@@ -89,6 +89,7 @@ enum ShipmentStatus {
 enum DeliveryMode {
   OWN // the shop's own staff delivers; the shop keeps the delivery fee
   RIDER // a Dukaan Express rider picks up and delivers; the rider earns the delivery fee
+  SELF_BOOKED // the shop books a delivery app (Rapido, Ola, Porter…) itself and pays for it; the customer pays no delivery fee
 }
 
 /// Rider verification: self-signed-up riders upload documents; their dealer or an admin approves.

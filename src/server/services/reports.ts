@@ -193,7 +193,7 @@ export async function buildReport(type: ReportType, from: Date, to: Date, shopId
         rows: rows.map((s) => ({
           order: s.order.orderNumber,
           shop: s.order.shop.name,
-          mode: s.mode === "OWN" ? "Shop" : "Rider",
+          mode: s.mode === "OWN" ? "Shop" : s.mode === "SELF_BOOKED" ? "Shop-booked" : "Rider",
           rider: s.rider?.user.name ?? null,
           status: s.status,
           attempts: s.attempts,
