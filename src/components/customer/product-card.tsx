@@ -101,12 +101,32 @@ export function ProductGrid({ items }: { items: ProductCardData[] }) {
   );
 }
 
-export function ProductRail({ title, items, href }: { title: string; items: ProductCardData[]; href?: string }) {
+export function ProductRail({
+  title,
+  items,
+  href,
+  icon,
+  subtitle,
+  className,
+}: {
+  title: string;
+  items: ProductCardData[];
+  href?: string;
+  icon?: React.ReactNode;
+  subtitle?: string;
+  className?: string;
+}) {
   if (!items.length) return null;
   return (
-    <section className="mt-8">
-      <div className="mb-3 flex items-end justify-between">
-        <h2 className="text-lg font-bold">{title}</h2>
+    <section className={cn("mt-8", className)}>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            {icon}
+            {title}
+          </h2>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
         {href && (
           <Link href={href} className="text-sm font-semibold text-primary">
             See all
