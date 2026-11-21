@@ -7,7 +7,7 @@ export const GET = api({ roles: ["SHOP_OWNER"] }, async ({ user }) => {
   const { shop } = await activeShopFor(user);
   const [overview, recent] = await Promise.all([
     payoutOverview(shop.id),
-    db.commission.findMany({ where: { shopId: shop.id }, include: { order: { select: { orderNumber: true, deliveredAt: true } } }, orderBy: { createdAt: "desc" }, take: 50 }),
+    db.commission.findMany({ where: { shopId: shop.id }, include: { order: { select: { orderNumber: true, deliveredAt: true } }, bulkOrder: { select: { number: true, deliveredAt: true } } }, orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   const { available, bank, open, payouts, paidOut } = overview;
   return {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  Warehouse,
   BarChart3,
   Bike,
   Boxes,
@@ -36,6 +37,7 @@ import { BrandName } from "@/components/shared/brand";
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: ClipboardList, badge: "orders" },
+  { href: "/admin/bulk-orders", label: "Bulk (B2B) orders", icon: Warehouse },
   { href: "/admin/shops", label: "Shops", icon: Store, badge: "shops" },
   { href: "/admin/owners", label: "Shop owners", icon: UserCog },
   { href: "/admin/dealers", label: "Dealers", icon: Handshake },

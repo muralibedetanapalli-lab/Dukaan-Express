@@ -26,7 +26,7 @@ export default async function DealerEarningsPage() {
       where: { dealerId, dealerAmount: { gt: 0 } },
       orderBy: { createdAt: "desc" },
       take: 30,
-      include: { order: { select: { orderNumber: true } }, shop: { select: { name: true } } },
+      include: { order: { select: { orderNumber: true } }, bulkOrder: { select: { number: true } }, shop: { select: { name: true } } },
     }),
   ]);
   const open = payouts.find((p) => p.status === "PENDING" || p.status === "PROCESSING") ?? null;
@@ -148,7 +148,7 @@ export default async function DealerEarningsPage() {
             )}
             {recent.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.order.orderNumber}</TableCell>
+                <TableCell className="font-medium">{c.order?.orderNumber ?? c.bulkOrder?.number}</TableCell>
                 <TableCell className="text-sm">{c.shop.name}</TableCell>
                 <TableCell className="text-sm">{fmtDate(c.createdAt)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatINR(c.amount)}</TableCell>

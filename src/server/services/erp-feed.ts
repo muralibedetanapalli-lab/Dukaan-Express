@@ -205,9 +205,41 @@ export async function eventsFeed(cursor: string | null | undefined, limit: numbe
       // Commission rows are written exactly once, when an order is delivered.
       key: "order.delivered",
       fetch: async (pos, take) => {
-        const rows = await db.commission.findMany({ where: after(pos, "createdAt"), include: { order: { include: { shipment: true } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take });
+        const rows = await db.commission.findMany({
+          where: after(pos, "createdAt"),
+          include: { order: { include: { shipment: true } }, bulkOrder: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take,
+        });
         return rows.map((c) => {
           const o = c.order;
+          if (!o) {
+            // Shop-to-shop bulk order.
+            const b = c.bulkOrder!;
+            return {
+              pos: [iso(c.createdAt), c.id] as Pos,
+              item: {
+                id: `bulk.delivered:${b.id}`,
+                type: "bulk.delivered",
+                occurredAt: iso(b.deliveredAt ?? c.createdAt),
+                data: {
+                  bulkOrderId: b.id,
+                  number: b.number,
+                  sellerShopId: b.sellerShopId,
+                  buyerShopId: b.buyerShopId,
+                  paymentMethod: b.paymentMethod,
+                  fulfilment: b.fulfilment,
+                  total: b.total,
+                  subtotal: b.subtotal,
+                  deliveryFee: b.deliveryFee,
+                  commissionAmount: c.amount,
+                  shopEarning: c.shopEarning,
+                  dealerId: c.dealerId,
+                  dealerAmount: c.dealerAmount,
+                },
+              },
+            };
+          }
           const s = o.shipment;
           return {
             pos: [iso(c.createdAt), c.id] as Pos,

@@ -41,6 +41,7 @@ const GROUPS: { key: string; label: string; fields: Field[] }[] = [
     fields: [
       { key: "defaultBps", label: "Platform commission (%)", kind: "percent", hint: "Applies to shops without a shop-specific rate" },
       { key: "chargeOn", label: "Charge commission on", kind: "select", options: ["ITEMS_AFTER_COUPON", "ITEMS_BEFORE_COUPON"] },
+      { key: "b2bBps", label: "Bulk (B2B) order commission (%)", kind: "percent", hint: "Charged to the selling shop on shop-to-shop bulk orders" },
     ],
   },
   {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Boxes, ClipboardList, IndianRupee, LayoutDashboard, LogOut, Settings, Store } from "lucide-react";
+import { Boxes, ClipboardList, IndianRupee, LayoutDashboard, LogOut, Settings, Store, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,8 @@ const NAV = [
   { href: "/shop", label: "Home", icon: LayoutDashboard },
   { href: "/shop/orders", label: "Orders", icon: ClipboardList },
   { href: "/shop/inventory", label: "Inventory", icon: Boxes },
-  { href: "/shop/earnings", label: "Earnings & payouts", icon: IndianRupee },
+  { href: "/shop/bulk", label: "Bulk", icon: Warehouse },
+  { href: "/shop/earnings", label: "Earnings", icon: IndianRupee },
   { href: "/shop/settings", label: "Settings", icon: Settings },
 ];
 
@@ -115,7 +116,7 @@ export function ShopChrome({
       </header>
       <main className="mx-auto max-w-5xl px-4 pt-4 pb-24 md:pb-10">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-6">
           {NAV.map((n) => (
             <li key={n.href}>
               <Link href={n.href} className={cn("flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold", isActive(n.href) ? "text-primary" : "text-muted-foreground")}>

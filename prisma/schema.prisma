@@ -277,6 +277,13 @@ model Shop {
   dealerId         String? // regional dealer who onboarded / manages this shop
   dealer           Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
   agreementAcceptedAt DateTime? // seller agreement signed (email OTP); the shop can't go live before
+  /// Wholesale (B2B): this shop sells in bulk to other shops.
+  sellsBulk         Boolean @default(false)
+  bulkMinOrder      Int     @default(0) // paise; minimum bulk order value
+  bulkDelivers      Boolean @default(true) // seller delivers bulk orders
+  bulkDeliveryFee   Int     @default(0) // paise; flat fee for seller delivery
+  bulkPickup        Boolean @default(true) // buyer may collect from the shop
+  bulkPayOnDelivery Boolean @default(true) // buyer may pay the seller on delivery / pickup
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   deletedAt        DateTime?
@@ -294,6 +301,8 @@ model Shop {
   coupons     Coupon[]
   cartItems   CartItem[]
   agreements  ShopAgreement[]
+  bulkPurchases BulkOrder[] @relation("BulkBuyer")
+  bulkSales     BulkOrder[] @relation("BulkSeller")
 
   @@index([approvalStatus, isActive])
   @@index([ownerId])
@@ -461,12 +470,15 @@ model ShopInventory {
   lowStockThreshold Int             @default(5)
   maxPerOrder       Int             @default(10)
   isAvailable       Boolean         @default(true)
+  bulkPrice         Int? // paise per unit for bulk buyers; null = not sold in bulk
+  bulkMinQty        Int             @default(1)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   deletedAt         DateTime?
 
   cartItems  CartItem[]
   orderItems OrderItem[]
+  bulkItems  BulkOrderItem[]
 
   @@unique([shopId, productId, variantKey])
   @@index([productId])
@@ -778,8 +790,10 @@ model ShipmentTrackingEvent {
 
 model Commission {
   id             String          @id @default(cuid())
-  orderId        String          @unique
-  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        String?         @unique
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bulkOrderId    String?         @unique // set instead of orderId for a shop-to-shop bulk order
+  bulkOrder      BulkOrder?      @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
   shopId         String
   shop           Shop            @relation(fields: [shopId], references: [id])
   baseAmount     Int // amount commission is charged on (items after coupon)
@@ -1212,4 +1226,85 @@ model ShopAgreement {
   updatedAt         DateTime        @updatedAt
 
   @@index([shopId, status])
+}
+
+enum BulkOrderStatus {
+  PAYMENT_PENDING // online payment not completed yet
+  PLACED // waiting for the seller to accept
+  ACCEPTED // seller accepted; stock reserved
+  DISPATCHED // seller sent it out
+  READY_FOR_PICKUP // buyer can collect
+  DELIVERED // handed over (delivered or picked up)
+  REJECTED // seller declined
+  CANCELLED // buyer cancelled before acceptance, seller couldn't fulfil, or payment expired
+}
+
+enum BulkFulfilment {
+  DELIVERY
+  PICKUP
+}
+
+enum BulkPayment {
+  ONLINE
+  ON_DELIVERY
+}
+
+/// A shop buying in bulk from another (wholesaler) shop. Money: online payments are collected by the
+/// platform and paid to the seller via payouts; on-delivery payments go to the seller directly, and the
+/// platform's B2B commission is deducted from the seller's balance.
+model BulkOrder {
+  id               String          @id @default(cuid())
+  number           String          @unique
+  buyerShopId      String
+  buyerShop        Shop            @relation("BulkBuyer", fields: [buyerShopId], references: [id])
+  sellerShopId     String
+  sellerShop       Shop            @relation("BulkSeller", fields: [sellerShopId], references: [id])
+  status           BulkOrderStatus
+  fulfilment       BulkFulfilment
+  paymentMethod    BulkPayment
+  paymentStatus    PaymentStatus   @default(PENDING)
+  itemCount        Int
+  subtotal         Int
+  deliveryFee      Int             @default(0)
+  total            Int
+  note             String?
+  buyerAddress     Json // snapshot of the buyer shop's address and contact
+  placedById       String
+  rejectReason     String?
+  cancelledBy      String? // BUYER | SELLER | SYSTEM
+  gatewayOrderId   String?         @unique
+  gatewayPaymentId String?
+  paidAt           DateTime?
+  refundId         String?         @unique
+  refundStatus     String? // PENDING | SUCCESS | FAILED
+  acceptedAt       DateTime?
+  dispatchedAt     DateTime?
+  deliveredAt      DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  items      BulkOrderItem[]
+  commission Commission?
+
+  @@index([buyerShopId, createdAt])
+  @@index([sellerShopId, status])
+  @@index([status, createdAt])
+}
+
+model BulkOrderItem {
+  id          String        @id @default(cuid())
+  bulkOrderId String
+  bulkOrder   BulkOrder     @relation(fields: [bulkOrderId], references: [id], onDelete: Cascade)
+  inventoryId String
+  inventory   ShopInventory @relation(fields: [inventoryId], references: [id])
+  productName String
+  variantName String?
+  unitLabel   String?
+  imageUrl    String?
+  quantity    Int
+  unitPrice   Int
+  lineTotal   Int
+
+  @@index([bulkOrderId])
 }

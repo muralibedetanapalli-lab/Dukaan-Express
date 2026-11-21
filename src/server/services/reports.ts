@@ -112,7 +112,7 @@ export async function buildReport(type: ReportType, from: Date, to: Date, shopId
     case "commission": {
       const rows = await db.commission.findMany({
         where: { createdAt: range, ...shopFilter },
-        include: { order: { select: { orderNumber: true } }, shop: { select: { name: true } }, settlement: { select: { status: true } } },
+        include: { order: { select: { orderNumber: true } }, bulkOrder: { select: { number: true } }, shop: { select: { name: true } }, settlement: { select: { status: true } } },
         orderBy: { createdAt: "asc" },
       });
       return {
@@ -129,7 +129,7 @@ export async function buildReport(type: ReportType, from: Date, to: Date, shopId
         ],
         rows: rows.map((c) => ({
           date: format(c.createdAt, "yyyy-MM-dd"),
-          order: c.order.orderNumber,
+          order: c.order?.orderNumber ?? (c.bulkOrder ? `${c.bulkOrder.number} (bulk)` : ""),
           shop: c.shop.name,
           base: c.baseAmount,
           rate: c.rateBps / 100,

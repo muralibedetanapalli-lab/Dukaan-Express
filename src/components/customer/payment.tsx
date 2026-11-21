@@ -47,8 +47,8 @@ function loadCashfree(): Promise<void> {
 }
 
 /** Asks the server (which asks Cashfree) how a payment ended. The browser's view is never trusted. */
-export async function confirmPayment(orderId: string, gatewayOrderId?: string): Promise<Outcome> {
-  const r = await api<{ outcome: "paid" | "failed" | "pending" }>("/payments/verify", { body: { orderId, ...(gatewayOrderId ? { gatewayOrderId } : {}) } });
+export async function confirmPayment(orderId: string, gatewayOrderId?: string, verifyPath = "/payments/verify"): Promise<Outcome> {
+  const r = await api<{ outcome: "paid" | "failed" | "pending" }>(verifyPath, { body: { orderId, ...(gatewayOrderId ? { gatewayOrderId } : {}) } });
   return r.outcome === "pending" ? "dismissed" : r.outcome;
 }
 
@@ -56,12 +56,14 @@ export async function confirmPayment(orderId: string, gatewayOrderId?: string): 
  * Opens Cashfree Checkout (live) or the in-app sandbox checkout, then confirms the result on the
  * server. Resolves "paid" | "failed" | "dismissed".
  */
-export function usePayment() {
+export function usePayment(paths?: { start: (orderId: string) => string; verify: (orderId: string) => string }) {
+  const startPath = paths?.start ?? ((id: string) => `/orders/${id}/pay`);
+  const verifyPath = paths?.verify ?? (() => "/payments/verify");
   const [sandbox, setSandbox] = useState<{ opts: CheckoutOptions; orderId: string; resolve: (r: Outcome) => void } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const pay = useCallback(async (orderId: string): Promise<Outcome> => {
-    const opts = await api<CheckoutOptions>(`/orders/${orderId}/pay`, { method: "POST" });
+    const opts = await api<CheckoutOptions>(startPath(orderId), { method: "POST" });
     if (opts.mode === "sandbox") {
       return new Promise((resolve) => setSandbox({ opts, orderId, resolve }));
     }
@@ -71,14 +73,15 @@ export function usePayment() {
     // Some in-app browsers can't show the popup: Cashfree then navigates away and comes back to
     // /orders/{id}?payment=return, where the order page confirms the payment.
     if (result.redirect) return new Promise<Outcome>(() => {});
-    return confirmPayment(orderId, opts.gatewayOrderId);
+    return confirmPayment(orderId, opts.gatewayOrderId, verifyPath(orderId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function sandboxComplete(outcome: "success" | "failure") {
     if (!sandbox) return;
     setBusy(true);
     try {
-      const r = await api<{ outcome: "paid" | "failed" | "pending" }>("/payments/verify", {
+      const r = await api<{ outcome: "paid" | "failed" | "pending" }>(verifyPath(sandbox.orderId), {
         body: { orderId: sandbox.orderId, gatewayOrderId: sandbox.opts.gatewayOrderId, sandboxOutcome: outcome },
       });
       sandbox.resolve(r.outcome === "paid" ? "paid" : "failed");

@@ -18,6 +18,7 @@ export const settingsSchema = z.object({
     .object({
       defaultBps: z.number().int().min(0).max(5000).default(1000), // 10%
       chargeOn: z.enum(["ITEMS_AFTER_COUPON", "ITEMS_BEFORE_COUPON"]).default("ITEMS_AFTER_COUPON"),
+      b2bBps: z.number().int().min(0).max(5000).default(500), // 5% on shop-to-shop bulk orders
     })
     .prefault({}),
   order: z

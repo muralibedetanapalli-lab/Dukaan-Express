@@ -15,7 +15,7 @@ export async function PendingPayoutReviews({ dealerId, limit }: { dealerId: stri
     take: limit,
     include: {
       shop: { select: { id: true, name: true, address: { select: { city: true } } } },
-      commissions: { select: { order: { select: { orderNumber: true } } }, orderBy: { createdAt: "desc" }, take: 8 },
+      commissions: { select: { id: true, order: { select: { orderNumber: true } }, bulkOrder: { select: { number: true } } }, orderBy: { createdAt: "desc" }, take: 8 },
     },
   });
   if (!items.length) {
@@ -75,7 +75,7 @@ export async function PendingPayoutReviews({ dealerId, limit }: { dealerId: stri
               <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                 Orders:
                 {p.commissions.map((c) => (
-                  <Pill key={c.order.orderNumber}>{c.order.orderNumber}</Pill>
+                  <Pill key={c.id}>{c.order?.orderNumber ?? c.bulkOrder?.number}</Pill>
                 ))}
                 {p.orderCount > p.commissions.length && <span>+{p.orderCount - p.commissions.length} more</span>}
               </p>

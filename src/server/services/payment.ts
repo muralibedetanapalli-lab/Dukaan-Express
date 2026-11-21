@@ -321,13 +321,25 @@ export async function handleCashfreeWebhook(rawBody: string, signature: string |
       if (p) {
         if (pay.payment_amount !== undefined && toPaise(pay.payment_amount) !== p.amount) throw new Error(`Amount mismatch for ${gatewayOrderId}`);
         await markPaymentCaptured(p.id, String(pay.cf_payment_id), pay.payment_group ?? null, body as unknown as Prisma.InputJsonValue);
+      } else {
+        // Shop-to-shop bulk order.
+        const b = await db.bulkOrder.findUnique({ where: { gatewayOrderId } });
+        if (b) {
+          if (pay.payment_amount !== undefined && toPaise(pay.payment_amount) !== b.total) throw new Error(`Amount mismatch for ${gatewayOrderId}`);
+          const { markBulkPaid } = await import("./bulk");
+          await markBulkPaid(b.id, String(pay.cf_payment_id));
+        }
       }
     } else if (body.type === "PAYMENT_FAILED_WEBHOOK" && gatewayOrderId && pay) {
       const p = await db.payment.findUnique({ where: { providerOrderId: gatewayOrderId } });
       if (p) await markPaymentFailed(p.id, pay.payment_message ?? "Payment failed");
     } else if (body.type === "REFUND_STATUS_WEBHOOK" && body.data?.refund) {
       const r = body.data.refund;
-      if (r.refund_status === "SUCCESS") {
+      if (r.refund_id.startsWith("BLKR_")) {
+        const { markBulkRefunded, markBulkRefundFailed } = await import("./bulk");
+        if (r.refund_status === "SUCCESS") await markBulkRefunded(r.refund_id);
+        else if (r.refund_status === "CANCELLED" || r.refund_status === "REJECTED") await markBulkRefundFailed(r.refund_id);
+      } else if (r.refund_status === "SUCCESS") {
         await markRefundProcessed(r.refund_id);
       } else if (r.refund_status === "CANCELLED" || r.refund_status === "REJECTED") {
         await db.refund.updateMany({

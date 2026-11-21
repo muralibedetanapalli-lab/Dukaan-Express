@@ -20,7 +20,8 @@ export type NotificationType =
   | "PAYOUT"
   | "MODIFICATION"
   | "DELIVERY_JOB"
-  | "WALLET";
+  | "WALLET"
+  | "BULK_ORDER";
 
 export interface NotifyInput {
   type: NotificationType;

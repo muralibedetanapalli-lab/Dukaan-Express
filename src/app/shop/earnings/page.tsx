@@ -22,7 +22,7 @@ export default async function EarningsPage() {
   const rate = bpsToPercent(shop.commissionBps ?? settings.commission.defaultBps);
   const [{ available, bank, open, payouts, paidOut }, recent, dealer] = await Promise.all([
     payoutOverview(shop.id),
-    db.commission.findMany({ where: { shopId: shop.id }, include: { order: { select: { orderNumber: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
+    db.commission.findMany({ where: { shopId: shop.id }, include: { order: { select: { orderNumber: true } }, bulkOrder: { select: { number: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
     shop.dealerId ? db.dealer.findUnique({ where: { id: shop.dealerId }, select: { user: { select: { name: true } } } }) : null,
   ]);
   const dealerName = dealer?.user.name ?? null;
@@ -199,7 +199,7 @@ export default async function EarningsPage() {
               const p = c.settlementId ? payouts.find((x) => x.id === c.settlementId) : null;
               return (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.order.orderNumber}</TableCell>
+                  <TableCell className="font-medium">{c.order?.orderNumber ?? (c.bulkOrder ? `${c.bulkOrder.number} (bulk)` : "—")}</TableCell>
                   <TableCell>{fmtDate(c.createdAt)}</TableCell>
                   <TableCell className="text-right">{formatINR(c.baseAmount)}</TableCell>
                   <TableCell className="text-right">

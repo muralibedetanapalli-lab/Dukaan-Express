@@ -5,6 +5,7 @@ import { errorResponse } from "@/server/http";
 import { unauthorized } from "@/server/errors";
 import { safeEqual } from "@/server/auth/password";
 import { expireUnpaidOrders, reconcileRefunds } from "@/server/services/payment";
+import { expireUnpaidBulkOrders } from "@/server/services/bulk";
 import { transitionOrder, SYSTEM } from "@/server/services/order";
 import { getSettings } from "@/server/services/settings";
 import { sweepWaitingDeliveries } from "@/server/services/delivery";
@@ -27,6 +28,10 @@ export async function GET(req: NextRequest) {
 
     const settings = await getSettings(true);
     const expired = await expireUnpaidOrders();
+    const bulkExpired = await expireUnpaidBulkOrders().catch((e) => {
+      console.warn("[cron] bulk expiry failed", e);
+      return 0;
+    });
     const refundsSettled = await reconcileRefunds();
 
     const acceptCutoff = new Date(Date.now() - settings.order.shopAcceptTimeoutMinutes * 60_000);
@@ -55,7 +60,7 @@ export async function GET(req: NextRequest) {
       db.otp.deleteMany({ where: { createdAt: { lt: day } } }),
       db.idempotencyKey.deleteMany({ where: { createdAt: { lt: day } } }),
     ]);
-    return NextResponse.json({ data: { expired, refundsSettled, autoRejected: ignored.length, waitingForRider: riders.waiting, noRiderAlerts: riders.alerted, badgesAwarded: badges, prunedOtps: otps.count, prunedKeys: keys.count } });
+    return NextResponse.json({ data: { expired, bulkExpired, refundsSettled, autoRejected: ignored.length, waitingForRider: riders.waiting, noRiderAlerts: riders.alerted, badgesAwarded: badges, prunedOtps: otps.count, prunedKeys: keys.count } });
   } catch (e) {
     return errorResponse(e);
   }
