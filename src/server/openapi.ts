@@ -156,6 +156,9 @@ const E: Ep[] = [
   { m: "post", p: "/webhooks/cashfree", tag: "Webhooks", s: "Cashfree webhook (x-webhook-signature: base64 HMAC-SHA256 of timestamp + body)" },
   { m: "get", p: "/cron/maintenance", tag: "Platform", s: "Maintenance job (Bearer CRON_SECRET)" },
   { m: "get", p: "/health", tag: "Platform", s: "Health + integration modes" },
+  // Metech ERP (server to server, Bearer ERP_API_KEY; cursor-paged, money in paise)
+  { m: "get", p: "/integrations/erp/parties", tag: "Integrations", s: "Metech ERP feed: shops, owners, dealers, riders, customers changed after the cursor (Bearer ERP_API_KEY)", query: ["after", "limit"] },
+  { m: "get", p: "/integrations/erp/events", tag: "Integrations", s: "Metech ERP feed: delivered orders, refunds, shop settlements, dealer payouts, rider withdrawals and wallet adjustments (Bearer ERP_API_KEY)", query: ["after", "limit"] },
 ];
 
 function schemaOf(t: z.ZodType) {

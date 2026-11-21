@@ -13,6 +13,7 @@ import { fmtDateTime } from "@/lib/format";
 import { ShopForm } from "../shop-form";
 import { regionFor } from "@/server/services/dealer";
 import { ShopDealerCard } from "./shop-dealer";
+import { ErpLink } from "@/components/admin/erp-link";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
         actions={
           <>
             <Pill tone={shop.approvalStatus === "APPROVED" ? "success" : shop.approvalStatus === "PENDING" ? "warning" : "danger"}>{shop.approvalStatus.toLowerCase()}</Pill>
+            <ErpLink type="shop" id={shop.id} />
             {shop.approvalStatus !== "APPROVED" && (
               <ActionButton path={`/admin/shops/${id}/actions`} body={{ action: "approve" }} success="Shop approved">
                 Approve

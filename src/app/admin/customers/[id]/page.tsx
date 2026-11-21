@@ -8,6 +8,7 @@ import { OrderStatusBadge, Pill } from "@/components/shared/status-badge";
 import { ActionButton } from "@/components/admin/action-button";
 import { formatINR } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/format";
+import { ErpLink } from "@/components/admin/erp-link";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +32,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         actions={
           <>
             <Pill tone={c.user.status === "ACTIVE" ? "success" : "danger"}>{c.user.status.toLowerCase()}</Pill>
+            <ErpLink type="customer" id={c.id} />
             <ActionButton
               path={`/admin/customers/${c.id}`}
               method="PATCH"

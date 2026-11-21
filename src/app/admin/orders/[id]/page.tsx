@@ -16,6 +16,7 @@ import { formatINR, bpsToPercent } from "@/lib/money";
 import { fmtDateTime } from "@/lib/format";
 import type { OrderStatusKey } from "@/lib/order-status";
 import { AdminOrderControls } from "./order-controls";
+import { ErpLink } from "@/components/admin/erp-link";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           <>
             <OrderStatusBadge status={order.status} />
             <PaymentBadge status={order.paymentStatus} method={order.paymentMethod} />
+            <ErpLink type="order" id={order.id} />
           </>
         }
       />
