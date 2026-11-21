@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { MapPin } from "lucide-react";
 import { getSessionUser } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { getSettings } from "@/server/services/settings";
@@ -23,26 +23,25 @@ export default async function DealerNewShopPage() {
         description="The shop goes live as soon as you save it. The owner can then add products from the Dukaan Partner app."
       />
       {regions.length === 0 ? (
-        <Card className="p-6 text-sm">
-          You don&apos;t have a region yet, so you can&apos;t onboard shops. Ask the platform admin to assign one.{" "}
-          <Link href="/dealer" className="font-medium text-primary hover:underline">
-            Back to home
-          </Link>
+        <Card className="mb-4 flex-row items-start gap-3 border-sky-200 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+          <MapPin className="mt-0.5 size-4 shrink-0" />
+          <p>
+            <b>Your first shop sets your area.</b> The pincode where you pin this shop becomes your service area, and your next shops must be in it.
+            The admin can add more areas for you later.
+          </p>
         </Card>
       ) : (
-        <>
-          <Card className="mb-4 gap-1 p-4 text-sm">
-            <p className="font-medium">Your regions</p>
-            {regions.map((r) => (
-              <p key={r.city} className="text-muted-foreground">
-                <b className="text-foreground">{r.city}</b>
-                {r.pincodes.length ? ` — pincodes ${r.pincodes.join(", ")}` : " — any pincode in the city"}
-              </p>
-            ))}
-          </Card>
-          <ShopForm mode="dealer" categories={categories} owners={[]} defaultCommission={settings.commission.defaultBps / 100} />
-        </>
+        <Card className="mb-4 gap-1 p-4 text-sm">
+          <p className="font-medium">Your area</p>
+          {regions.map((r, i) => (
+            <p key={i} className="text-muted-foreground">
+              <b className="text-foreground">{r.city}</b>
+              {r.pincodes.length ? ` · pincode${r.pincodes.length > 1 ? "s" : ""} ${r.pincodes.join(", ")}` : " · any pincode in the city"}
+            </p>
+          ))}
+        </Card>
       )}
+      <ShopForm mode="dealer" categories={categories} owners={[]} defaultCommission={settings.commission.defaultBps / 100} />
     </div>
   );
 }

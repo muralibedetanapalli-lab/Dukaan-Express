@@ -36,10 +36,16 @@ export function MapPicker({
   start,
   onConfirm,
   onClose,
+  pinLabel = "Your order will be delivered here",
+  locateOnOpen = false,
 }: {
   start: { lat: number; lng: number; zoom?: number };
   onConfirm: (p: PickedPlace) => void;
   onClose: () => void;
+  /** Text on the pin, e.g. "The shop is here". */
+  pinLabel?: string;
+  /** Jump to the device's GPS position when the map opens (e.g. a dealer standing at the shop). */
+  locateOnOpen?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -72,6 +78,13 @@ export function MapPicker({
       });
       map.current = m;
       setTimeout(() => m.invalidateSize(), 50);
+      if (locateOnOpen && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => !cancelled && m.setView([pos.coords.latitude, pos.coords.longitude], 18),
+          () => {},
+          { enableHighAccuracy: true, timeout: 10_000 },
+        );
+      }
     })();
     return () => {
       cancelled = true;
@@ -165,7 +178,7 @@ export function MapPicker({
         <div className="pointer-events-none absolute top-1/2 left-1/2 z-[1000] -translate-x-1/2 -translate-y-full">
           <div className={`flex flex-col items-center transition-transform ${moving ? "-translate-y-2" : ""}`}>
             <span className="mb-1 rounded-full bg-foreground px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-background shadow">
-              {moving ? "Release to set" : "Your order will be delivered here"}
+              {moving ? "Release to set" : pinLabel}
             </span>
             <MapPin className="size-10 fill-primary text-primary-foreground drop-shadow-lg" strokeWidth={1.5} />
           </div>

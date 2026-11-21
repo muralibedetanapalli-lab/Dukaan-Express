@@ -42,12 +42,12 @@ export function DealerChrome({ name, regions, pending, ridersToVerify = 0, child
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm leading-tight font-bold">{name}</span>
-                <span className="block truncate text-xs text-muted-foreground">Dealer · {regions.length ? regions.join(", ") : "No region yet"}</span>
+                <span className="block truncate text-xs text-muted-foreground">Dealer · {regions.length ? regions.join(", ") : "Area set by first shop"}</span>
               </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuLabel>Regions</DropdownMenuLabel>
-              <p className="px-2 pb-1.5 text-xs text-muted-foreground">{regions.length ? regions.join(", ") : "Ask the admin to assign a region"}</p>
+              <p className="px-2 pb-1.5 text-xs text-muted-foreground">{regions.length ? regions.join(", ") : "Your first shop's pincode becomes your area"}</p>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout}>
                 <LogOut /> Log out

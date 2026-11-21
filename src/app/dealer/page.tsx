@@ -42,7 +42,7 @@ export default async function DealerHome() {
         <StatCard label="My shops" value={shops} hint={`${live} live`} icon={Store} tone="primary" href="/dealer/shops" />
         <StatCard label="To approve" value={pending} hint="shop & rider payouts" icon={BadgeCheck} tone={pending ? "warning" : "default"} href="/dealer/payouts" />
         <StatCard label="My earnings" value={formatINR(balance.amount)} hint={`from ${balance.orders} orders`} icon={IndianRupee} tone="success" href="/dealer/earnings" />
-        <StatCard label="Regions" value={regions.length} hint={regions.map((r) => r.city).join(", ") || "none yet"} icon={MapPin} />
+        <StatCard label="Regions" value={regions.length} hint={regions.map((r) => (r.pincodes.length ? `${r.city} ${r.pincodes.join(", ")}` : r.city)).join("; ") || "set by your first shop"} icon={MapPin} />
       </div>
 
       <section className="space-y-3">
@@ -60,7 +60,7 @@ export default async function DealerHome() {
 
       {regions.length === 0 && (
         <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          You don&apos;t have a region yet, so you can&apos;t onboard shops. Ask the platform admin to assign one to you.
+          You don&apos;t have an area yet. <b>Onboard your first shop</b> and its pincode becomes your service area.
         </Card>
       )}
     </div>

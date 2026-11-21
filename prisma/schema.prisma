@@ -944,7 +944,8 @@ model ServiceArea {
   dealer   Dealer? @relation(fields: [dealerId], references: [id], onDelete: SetNull)
   riders   Rider[]
 
-  @@unique([city, state])
+  // A city can hold several areas (e.g. one per dealer pincode), so city + state is not unique.
+  @@index([city, state])
   @@index([dealerId])
 }
 

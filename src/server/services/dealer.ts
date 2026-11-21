@@ -17,6 +17,8 @@ import { PAYOUT_METHODS, toView, type BankInput, type BankView } from "./payout"
  * Regional dealers.
  * - The admin creates a dealer and assigns regions (service areas). One dealer per region.
  * - A dealer onboards shops in their regions (shop + owner login, live immediately) and sees only their shops.
+ *   A dealer with no region yet may onboard anywhere: the pincode of their first shop becomes their region
+ *   (unless another dealer already covers it). After that, new shops must be inside their regions.
  * - Payout requests from a dealer's shops wait in DEALER_REVIEW; the dealer approves (→ PENDING, the admin's
  *   queue) or rejects (orders return to the shop's balance).
  * - On every delivered order of their shops the dealer earns `commissionShareBps` of the platform commission
@@ -133,17 +135,48 @@ export function regionFor(regions: { id: string; city: string; pincodes: string[
   return regions.find((r) => (r.pincodes.length ? r.pincodes.includes(address.pincode) : norm(r.city) === norm(address.city))) ?? null;
 }
 
+/**
+ * A dealer's first shop sets their region: the region holding that pincode is claimed (or created).
+ * Refused when another dealer already covers the pincode (or the whole city).
+ */
+async function claimFirstRegion(actor: SessionUser, dealerId: string, a: { city: string; state: string; pincode: string; latitude: number; longitude: number }) {
+  const areas = await db.serviceArea.findMany({ select: { id: true, city: true, pincodes: true, dealerId: true } });
+  const exact = areas.find((r) => r.pincodes.includes(a.pincode));
+  const cityWide = areas.find((r) => !r.pincodes.length && norm(r.city) === norm(a.city) && r.dealerId);
+  const holder = exact?.dealerId ? exact : cityWide;
+  if (holder?.dealerId && holder.dealerId !== dealerId) {
+    throw conflict(`Pincode ${a.pincode} is already covered by another dealer. Ask the admin if this shop should be yours.`);
+  }
+  const region = exact
+    ? await db.serviceArea.update({ where: { id: exact.id }, data: { dealerId } })
+    : await db.serviceArea.create({
+        data: {
+          city: a.city.trim(),
+          state: a.state.trim(),
+          pincodes: [a.pincode],
+          localities: [{ name: `${a.city.trim()} ${a.pincode}`, lat: a.latitude, lng: a.longitude, pincode: a.pincode }],
+          centerLat: a.latitude,
+          centerLng: a.longitude,
+          dealerId,
+        },
+      });
+  await audit(actorOf(actor), "dealer.region_claimed", "ServiceArea", region.id, { after: { dealerId, pincode: a.pincode, city: a.city, created: !exact } });
+  await notifyAdmins({ type: "SHOP", title: "Dealer area set", body: `${actor.name ?? "A dealer"} now covers pincode ${a.pincode} (${a.city}) from their first shop`, link: "/admin/dealers" });
+  return region;
+}
+
 export async function dealerOnboardShop(actor: SessionUser, input: z.infer<typeof zDealerShopInput>) {
   const dealerId = requireDealer(actor);
   const regions = await db.serviceArea.findMany({ where: { dealerId }, select: { id: true, city: true, pincodes: true } });
-  if (!regions.length) throw badRequest("You have no regions assigned yet. Ask the admin to assign one.");
-  if (!regionFor(regions, input.address)) {
-    throw badRequest(`This address is outside your regions (${regions.map((r) => r.city).join(", ")}). Check the city and pincode.`);
+  if (regions.length && !regionFor(regions, input.address)) {
+    const where = regions.map((r) => (r.pincodes.length ? `${r.city} ${r.pincodes.join(", ")}` : r.city)).join("; ");
+    throw badRequest(`This address is outside your area (${where}). Check the pincode, or ask the admin to add this area to you.`);
   }
   const password = input.owner.password || temporaryPassword();
   if (!passwordPolicy.test(password)) throw badRequest(passwordPolicy.message);
   const clash = await db.user.findFirst({ where: { OR: [{ email: input.owner.email }, { phone: input.owner.phone }] } });
   if (clash) throw conflict("A user with this owner email or mobile number already exists");
+  if (!regions.length) await claimFirstRegion(actor, dealerId, input.address);
 
   const owner = await db.user.create({
     data: { role: "SHOP_OWNER", name: input.owner.name, email: input.owner.email, phone: input.owner.phone, passwordHash: await hashPassword(password), shopOwner: { create: {} } },

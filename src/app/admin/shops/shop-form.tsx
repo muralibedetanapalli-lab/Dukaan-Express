@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, LocateFixed } from "lucide-react";
+import { CheckCircle2, Loader2, LocateFixed, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,7 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageUploader } from "@/components/shared/image-uploader";
 import { api, errorMessage } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import type { DeliveryModeKey } from "@/lib/delivery-mode";
+import { MapPicker, type PickedPlace } from "@/components/customer/map-picker";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -73,11 +75,36 @@ export function ShopForm({
   const [v, setV] = useState<ShopFormValue>(initial ?? blankShop);
   const [owner, setOwner] = useState({ name: "", email: "", phone: "", password: "" });
   const [busy, setBusy] = useState(false);
+  const [picker, setPicker] = useState(false);
+  // Dealers must drop the pin on the map themselves (riders navigate to it; it also sets the dealer's area).
+  const [pinned, setPinned] = useState(!!initial?.address.latitude);
+  const hasPin = v.address.latitude !== "" && v.address.longitude !== "";
   const set = <K extends keyof ShopFormValue>(k: K, val: ShopFormValue[K]) => setV((p) => ({ ...p, [k]: val }));
   const setA = (k: keyof ShopFormValue["address"], val: string) => setV((p) => ({ ...p, address: { ...p.address, [k]: val } }));
 
+  /** Fill the address from the map pin; typed fields that are already filled are kept. */
+  function applyPin(p: PickedPlace) {
+    setV((x) => ({
+      ...x,
+      address: {
+        ...x.address,
+        latitude: p.lat.toFixed(6),
+        longitude: p.lng.toFixed(6),
+        line1: x.address.line1 || p.line1,
+        city: x.address.city || p.city,
+        state: x.address.state || p.state,
+        pincode: p.pincode || x.address.pincode,
+      },
+    }));
+    setPinned(true);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (dealer && !pinned) {
+      toast.error("Pin the shop's exact location on the map first");
+      return;
+    }
     setBusy(true);
     try {
       const body = {
@@ -195,7 +222,7 @@ export function ShopForm({
             <F label="Owner mobile (blank = shop mobile)">
               <Input
                 value={owner.phone}
-                onChange={(e) => setOwner({ ...owner, phone: e.target.value.replace(/D/g, "").slice(0, 10) })}
+                onChange={(e) => setOwner({ ...owner, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                 inputMode="numeric"
                 placeholder={v.contactPhone}
               />
@@ -208,22 +235,45 @@ export function ShopForm({
       )}
 
       <Card className="gap-4 p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-semibold">Address & location</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigator.geolocation?.getCurrentPosition(
-                (p) => setV((x) => ({ ...x, address: { ...x.address, latitude: p.coords.latitude.toFixed(6), longitude: p.coords.longitude.toFixed(6) } })),
-                () => toast.error("Could not get location"),
-              )
-            }
-          >
-            <LocateFixed /> Use my location
-          </Button>
+          {!dealer && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigator.geolocation?.getCurrentPosition(
+                  (p) => setV((x) => ({ ...x, address: { ...x.address, latitude: p.coords.latitude.toFixed(6), longitude: p.coords.longitude.toFixed(6) } })),
+                  () => toast.error("Could not get location"),
+                )
+              }
+            >
+              <LocateFixed /> Use my location
+            </Button>
+          )}
         </div>
+        {/* Exact pin: required for dealers (riders navigate to it, and a dealer's first shop sets their area). */}
+        <button
+          type="button"
+          onClick={() => setPicker(true)}
+          className={cn(
+            "flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors",
+            pinned && hasPin ? "border-primary/40 bg-secondary/60" : dealer ? "border-dashed border-amber-400 bg-amber-50 dark:bg-amber-950/30" : "border-dashed hover:bg-muted/50",
+          )}
+        >
+          <span className={cn("grid size-10 shrink-0 place-items-center rounded-full", pinned && hasPin ? "bg-primary text-primary-foreground" : "bg-amber-500 text-white")}>
+            {pinned && hasPin ? <CheckCircle2 className="size-5" /> : <MapPin className="size-5" />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">{pinned && hasPin ? "Shop location pinned" : dealer ? "Pin the shop's exact location *" : "Pin the location on a map"}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {pinned && hasPin
+                ? `${Number(v.address.latitude).toFixed(5)}, ${Number(v.address.longitude).toFixed(5)}${v.address.pincode ? ` · ${v.address.pincode}` : ""} · tap to adjust`
+                : "Stand at the shop entrance, then drag the map so the pin sits on it"}
+            </span>
+          </span>
+        </button>
         <F label="Address line *">
           <Input value={v.address.line1} onChange={(e) => setA("line1", e.target.value)} required minLength={3} />
         </F>
@@ -245,13 +295,29 @@ export function ShopForm({
           <F label="Pincode *">
             <Input value={v.address.pincode} onChange={(e) => setA("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))} required inputMode="numeric" />
           </F>
-          <F label="Latitude *">
-            <Input value={v.address.latitude} onChange={(e) => setA("latitude", e.target.value)} required inputMode="decimal" />
-          </F>
-          <F label="Longitude *">
-            <Input value={v.address.longitude} onChange={(e) => setA("longitude", e.target.value)} required inputMode="decimal" />
-          </F>
+          {!dealer && (
+            <>
+              <F label="Latitude *">
+                <Input value={v.address.latitude} onChange={(e) => setA("latitude", e.target.value)} required inputMode="decimal" />
+              </F>
+              <F label="Longitude *">
+                <Input value={v.address.longitude} onChange={(e) => setA("longitude", e.target.value)} required inputMode="decimal" />
+              </F>
+            </>
+          )}
         </div>
+        {picker && (
+          <MapPicker
+            start={hasPin ? { lat: Number(v.address.latitude), lng: Number(v.address.longitude), zoom: 18 } : { lat: 12.9716, lng: 77.5946, zoom: 12 }}
+            onClose={() => setPicker(false)}
+            pinLabel="The shop entrance is here"
+            locateOnOpen={!hasPin}
+            onConfirm={(p) => {
+              applyPin(p);
+              setPicker(false);
+            }}
+          />
+        )}
         <p className="text-xs text-muted-foreground">Riders come to this address to pick up orders, so place the pin at the shop entrance.</p>
       </Card>
 

@@ -85,6 +85,45 @@ describe("dealers (integration)", () => {
     expect(r2.id).toBeTruthy();
   });
 
+  it("a dealer with no area claims the pincode of their first shop; other dealers can't onboard there", async () => {
+    const f = await fixture();
+    const mk = async (n: number) => {
+      const { id: dealerId } = await createDealer(asUser(f.admin), { name: `New ${n}`, email: `new${n}@dealer.in`, phone: `981110010${n}`, password: "Dealer@123", commissionShareBps: 2000, regionIds: [] });
+      const d = await db.dealer.findUniqueOrThrow({ where: { id: dealerId } });
+      return asUser({ id: d.userId, role: "DEALER", name: `New ${n}`, dealerId });
+    };
+    const first = await mk(1);
+    const second = await mk(2);
+    const base = {
+      name: "Pin Kirana",
+      contactPhone: "9822200011",
+      deliveryRadiusKm: 4,
+      avgPrepMinutes: 10,
+      address: { line1: "5 Market Street", city: "Hubballi", state: "Karnataka", pincode: "580020", latitude: 15.35, longitude: 75.13 },
+      owner: { name: "Pin", email: "pin@shop.in", phone: "9822200012", password: "Owner@123" },
+    };
+
+    // No region yet → allowed; the shop's pincode becomes the dealer's region.
+    const r = await dealerOnboardShop(first, zDealerShopInput.parse(base));
+    expect((await db.shop.findUniqueOrThrow({ where: { id: r.id } })).dealerId).toBe(first.dealerId);
+    const regions = await db.serviceArea.findMany({ where: { dealerId: first.dealerId } });
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toMatchObject({ city: "Hubballi", pincodes: ["580020"], centerLat: 15.35 });
+
+    // A second dealer's first shop in the same pincode is refused, and nothing is created for it.
+    const other = { ...base, name: "Rival Store", owner: { ...base.owner, email: "rival@shop.in", phone: "9822200013" } };
+    await expect(dealerOnboardShop(second, zDealerShopInput.parse(other))).rejects.toMatchObject({ status: 409 });
+    expect(await db.user.count({ where: { email: "rival@shop.in" } })).toBe(0);
+    expect(await db.serviceArea.count({ where: { dealerId: second.dealerId } })).toBe(0);
+
+    // Once set, the first dealer can't onboard outside their pincode…
+    const outside = { ...base, name: "Far Store", address: { ...base.address, pincode: "580021" }, owner: { ...base.owner, email: "far@shop.in", phone: "9822200014" } };
+    await expect(dealerOnboardShop(first, zDealerShopInput.parse(outside))).rejects.toMatchObject({ status: 400 });
+    // …but the second dealer can claim a free pincode.
+    const own = await dealerOnboardShop(second, zDealerShopInput.parse(outside));
+    expect((await db.shop.findUniqueOrThrow({ where: { id: own.id } })).dealerId).toBe(second.dealerId);
+  });
+
   it("shop payout → dealer approves → admin pays; dealer earns their share of commission", async () => {
     const f = await fixture();
     const { actor, dealerId } = await dealerSetup(f);

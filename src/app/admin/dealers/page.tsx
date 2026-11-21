@@ -14,14 +14,14 @@ export default async function DealersPage() {
   const [dealers, areas, earned, owed] = await Promise.all([
     db.dealer.findMany({
       where: { user: { deletedAt: null } },
-      include: { user: true, regions: { select: { id: true, city: true } }, _count: { select: { shops: { where: { deletedAt: null } } } } },
+      include: { user: true, regions: { select: { id: true, city: true, pincodes: true } }, _count: { select: { shops: { where: { deletedAt: null } } } } },
       orderBy: { createdAt: "desc" },
     }),
     db.serviceArea.findMany({ orderBy: [{ state: "asc" }, { city: "asc" }], include: { dealer: { select: { id: true, user: { select: { name: true } } } } } }),
     db.commission.groupBy({ by: ["dealerId"], where: { dealerId: { not: null } }, _sum: { dealerAmount: true } }),
     db.commission.groupBy({ by: ["dealerId"], where: { dealerId: { not: null }, dealerPayoutId: null }, _sum: { dealerAmount: true } }),
   ]);
-  const regions: RegionOption[] = areas.map((a) => ({ id: a.id, label: `${a.city}, ${a.state}`, dealerId: a.dealer?.id ?? null, dealerName: a.dealer?.user.name ?? null }));
+  const regions: RegionOption[] = areas.map((a) => ({ id: a.id, label: `${a.city}${a.pincodes.length ? ` ${a.pincodes.join(", ")}` : ""}, ${a.state}`, dealerId: a.dealer?.id ?? null, dealerName: a.dealer?.user.name ?? null }));
   const earnedOf = new Map(earned.map((e) => [e.dealerId, e._sum.dealerAmount ?? 0]));
   const owedOf = new Map(owed.map((e) => [e.dealerId, e._sum.dealerAmount ?? 0]));
   const free = areas.filter((a) => !a.dealerId).map((a) => a.city);
@@ -63,7 +63,7 @@ export default async function DealersPage() {
                     {d.user.email} · {d.user.phone}
                   </p>
                 </TableCell>
-                <TableCell className="text-xs">{d.regions.map((r) => r.city).join(", ") || <span className="text-muted-foreground">None</span>}</TableCell>
+                <TableCell className="text-xs">{d.regions.map((r) => (r.pincodes.length ? `${r.city} ${r.pincodes.join(", ")}` : r.city)).join("; ") || <span className="text-muted-foreground">Set by first shop</span>}</TableCell>
                 <TableCell className="text-right">{d._count.shops}</TableCell>
                 <TableCell className="text-right">{bpsToPercent(d.commissionShareBps)}</TableCell>
                 <TableCell className="text-right text-xs tabular-nums">
