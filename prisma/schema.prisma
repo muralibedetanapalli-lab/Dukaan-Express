@@ -167,6 +167,9 @@ model User {
   status          UserStatus @default(ACTIVE)
   sessionVersion  Int        @default(0)
   lastLoginAt     DateTime?
+  /// Temporary password (AES-encrypted) kept only until the welcome email goes out, e.g. while a shop owner's agreement is unsigned.
+  welcomeSecret   String?
+  welcomeSentAt   DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   deletedAt       DateTime?
@@ -273,6 +276,7 @@ model Shop {
   deliveryMode     DeliveryMode   @default(RIDER)
   dealerId         String? // regional dealer who onboarded / manages this shop
   dealer           Dealer?        @relation(fields: [dealerId], references: [id], onDelete: SetNull)
+  agreementAcceptedAt DateTime? // seller agreement signed (email OTP); the shop can't go live before
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   deletedAt        DateTime?
@@ -289,6 +293,7 @@ model Shop {
   reviews     Review[]
   coupons     Coupon[]
   cartItems   CartItem[]
+  agreements  ShopAgreement[]
 
   @@index([approvalStatus, isActive])
   @@index([ownerId])
@@ -1179,4 +1184,32 @@ model Badge {
   @@index([shopId])
   @@index([riderId])
   @@index([period])
+}
+
+enum AgreementStatus {
+  PENDING
+  ACCEPTED
+  VOID
+}
+
+/// The seller agreement emailed to a shop owner at onboarding. `terms` is a frozen snapshot of what they sign;
+/// the owner opens the emailed link, confirms with a code sent to the same email, and the shop goes live.
+model ShopAgreement {
+  id                String          @id @default(cuid())
+  shopId            String
+  shop              Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  number            String          @unique // e.g. AGR-2026-7KQ2MX
+  status            AgreementStatus @default(PENDING)
+  tokenHash         String          @unique
+  sentTo            String
+  sentAt            DateTime        @default(now())
+  terms             Json
+  acceptedAt        DateTime?
+  acceptedName      String?
+  acceptedIp        String?
+  acceptedUserAgent String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([shopId, status])
 }

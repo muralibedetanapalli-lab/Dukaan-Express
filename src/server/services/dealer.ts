@@ -12,11 +12,13 @@ import { audit } from "./audit";
 import { createShop, zShopInput } from "./admin";
 import { notifyAdmins, notifyShop, notifyUsers } from "./notification";
 import { PAYOUT_METHODS, toView, type BankInput, type BankView } from "./payout";
+import { holdWelcome, sendWelcome } from "./welcome";
 
 /**
  * Regional dealers.
  * - The admin creates a dealer and assigns regions (service areas). One dealer per region.
- * - A dealer onboards shops in their regions (shop + owner login, live immediately) and sees only their shops.
+ * - A dealer onboards shops in their regions (shop + owner login) and sees only their shops. The shop goes live
+ *   once the owner signs the seller agreement emailed to them (see agreement.ts).
  *   A dealer with no region yet may onboard anywhere: the pincode of their first shop becomes their region
  *   (unless another dealer already covers it). After that, new shops must be inside their regions.
  * - Payout requests from a dealer's shops wait in DEALER_REVIEW; the dealer approves (→ PENDING, the admin's
@@ -75,6 +77,8 @@ export async function createDealer(actor: SessionUser, input: z.infer<typeof zDe
     return user.dealer!;
   });
   await audit(actorOf(actor), "dealer.create", "Dealer", dealer.id, { after: { name: input.name, email: input.email, share: input.commissionShareBps, regions: input.regionIds } });
+  // Active straight away: email the login details now.
+  await sendWelcome(dealer.userId, password);
   return { id: dealer.id, temporaryPassword: input.password ? null : password };
 }
 
@@ -182,12 +186,15 @@ export async function dealerOnboardShop(actor: SessionUser, input: z.infer<typeo
     data: { role: "SHOP_OWNER", name: input.owner.name, email: input.owner.email, phone: input.owner.phone, passwordHash: await hashPassword(password), shopOwner: { create: {} } },
     include: { shopOwner: true },
   });
+  // Login details are emailed in the welcome once the owner signs the agreement and the shop goes live.
+  await holdWelcome(owner.id, password);
   const { owner: _o, ...shopInput } = input;
-  const shop = await createShop(actor, { ...shopInput, ownerId: owner.shopOwner!.id, commissionBps: null }, { dealerId, goLive: true });
+  // The owner gets the seller agreement by email; the shop goes live when they sign it.
+  const shop = await createShop(actor, { ...shopInput, ownerId: owner.shopOwner!.id, commissionBps: null }, { dealerId });
   await audit(actorOf(actor), "owner.create", "User", owner.id, { after: { name: input.owner.name, email: input.owner.email, shopId: shop.id } });
   const dealerName = actor.name ?? "A dealer";
   await notifyAdmins({ type: "SHOP", title: "New shop onboarded by dealer", body: `${dealerName} onboarded ${shop.name} (${input.address.city})`, link: `/admin/shops/${shop.id}` });
-  return { id: shop.id, ownerEmail: input.owner.email, temporaryPassword: input.owner.password ? null : password };
+  return { id: shop.id, ownerEmail: input.owner.email, temporaryPassword: input.owner.password ? null : password, agreement: shop.agreement };
 }
 
 export function requireDealer(actor: SessionUser) {

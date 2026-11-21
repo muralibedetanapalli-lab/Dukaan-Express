@@ -367,6 +367,7 @@ async function main() {
         logoUrl: art(`shop-${s.name}`, CATEGORIES.find((c) => c.name === s.category)!.emoji, "#14532d", "#22c55e"),
         approvalStatus: s.approval,
         isActive: s.active,
+        agreementAcceptedAt: s.active ? new Date() : null,
         deliveryRadiusKm: s.radius,
         commissionBps: s.commissionBps,
         avgPrepMinutes: s.prep,

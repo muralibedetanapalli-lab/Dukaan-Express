@@ -1,4 +1,5 @@
 import "server-only";
+import { sendWelcome, updateHeldWelcome } from "./welcome";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { badRequest, conflict, forbidden, notFound } from "@/server/errors";
@@ -77,6 +78,8 @@ export async function createRider(actor: SessionUser, input: z.infer<typeof zRid
     include: { rider: true },
   });
   await audit(actorOf(actor), "rider.create", "Rider", user.rider!.id, { after: { name: input.name, email: input.email, dealerId } });
+  // Added by an admin or dealer, so already approved: email the login details now.
+  await sendWelcome(user.id, password);
   return { id: user.rider!.id, temporaryPassword: input.password ? null : password };
 }
 
@@ -120,6 +123,7 @@ export async function resetRiderPassword(actor: SessionUser, riderId: string) {
   const password = temporaryPassword();
   await db.user.update({ where: { id: r.userId }, data: { passwordHash: await hashPassword(password), sessionVersion: { increment: 1 } } });
   await audit(actorOf(actor), "user.password_reset", "User", r.userId);
+  await updateHeldWelcome(r.userId, password);
   return { temporaryPassword: password };
 }
 

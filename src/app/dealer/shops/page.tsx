@@ -51,7 +51,7 @@ export default async function DealerShopsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium">
                     {s.name}
-                    {!s.isActive || s.approvalStatus !== "APPROVED" ? <Pill tone="neutral">Inactive</Pill> : !s.acceptingOrders ? <Pill tone="warning">Paused</Pill> : <Pill tone="success">Live</Pill>}
+                    {!s.agreementAcceptedAt && !s.isActive ? <Pill tone="warning">Waiting for agreement</Pill> : !s.isActive || s.approvalStatus !== "APPROVED" ? <Pill tone="neutral">Inactive</Pill> : !s.acceptingOrders ? <Pill tone="warning">Paused</Pill> : <Pill tone="success">Live</Pill>}
                     {waitingOf.get(s.id) ? <Pill tone="warning">Payout to approve</Pill> : null}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">

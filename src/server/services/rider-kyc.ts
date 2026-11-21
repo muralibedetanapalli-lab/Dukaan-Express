@@ -1,4 +1,5 @@
 import "server-only";
+import { releaseWelcome } from "./welcome";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { badRequest, conflict, forbidden, notFound } from "@/server/errors";
@@ -192,6 +193,8 @@ export async function reviewKyc(actor: SessionUser, riderId: string, decision: {
   });
   if (r.count !== 1) throw conflict("Someone else just reviewed this rider");
   await audit({ id: actor.id, role: actor.role }, decision.approve ? "rider.kyc_approve" : "rider.kyc_reject", "Rider", riderId, { after: decision });
+  // A self-signed-up rider is active once approved: welcome them (they chose their own password).
+  if (decision.approve) await releaseWelcome(rider.userId);
   await notifyUsers([rider.userId], decision.approve
     ? { type: "SHOP", title: "You're approved! 🎉", body: "Go online in the Dukaan Rider app to start getting deliveries.", link: "/rider" }
     : { type: "SHOP", title: "Documents need changes", body: decision.reason, link: "/rider" });

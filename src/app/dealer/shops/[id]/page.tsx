@@ -11,6 +11,8 @@ import { OrderStatusBadge, Pill } from "@/components/shared/status-badge";
 import { bpsToPercent, formatINR } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { payoutStatus } from "@/lib/payout";
+import { AgreementCard } from "@/components/shared/agreement-card";
+import { agreementSummary } from "@/server/services/agreement";
 
 export const metadata = { title: "Shop" };
 
@@ -22,13 +24,14 @@ export default async function DealerShopPage({ params }: { params: Promise<{ id:
     include: { address: true, category: { select: { name: true } }, owner: { include: { user: { select: { name: true, email: true, phone: true, lastLoginAt: true } } } }, _count: { select: { inventory: true } } },
   });
   if (!shop) notFound();
-  const [settings, bank, delivered, earned, orders, payouts] = await Promise.all([
+  const [settings, bank, delivered, earned, orders, payouts, agreement] = await Promise.all([
     getSettings(),
     getBankAccount(shop.id),
     db.commission.aggregate({ where: { shopId: shop.id }, _sum: { baseAmount: true, shopEarning: true }, _count: true }),
     db.commission.aggregate({ where: { shopId: shop.id, dealerId: user.dealerId! }, _sum: { dealerAmount: true } }),
     db.order.findMany({ where: { shopId: shop.id }, orderBy: { placedAt: "desc" }, take: 10, select: { id: true, orderNumber: true, status: true, total: true, placedAt: true } }),
     db.shopSettlement.findMany({ where: { shopId: shop.id }, orderBy: { createdAt: "desc" }, take: 10 }),
+    agreementSummary(shop.id),
   ]);
   const live = shop.isActive && shop.approvalStatus === "APPROVED";
 
@@ -39,11 +42,23 @@ export default async function DealerShopPage({ params }: { params: Promise<{ id:
         title={shop.name}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            {live ? (shop.acceptingOrders ? <Pill tone="success">Live</Pill> : <Pill tone="warning">Paused by owner</Pill>) : <Pill>Inactive</Pill>}
+            {live ? (
+              shop.acceptingOrders ? (
+                <Pill tone="success">Live</Pill>
+              ) : (
+                <Pill tone="warning">Paused by owner</Pill>
+              )
+            ) : !shop.agreementAcceptedAt ? (
+              <Pill tone="warning">Waiting for agreement</Pill>
+            ) : (
+              <Pill>Inactive</Pill>
+            )}
             {shop.category?.name} · onboarded {fmtDate(shop.createdAt)}
           </span>
         }
       />
+
+      {(!shop.agreementAcceptedAt || agreement) && <AgreementCard shopId={shop.id} agreement={agreement} hasOwner={!!shop.owner?.user.email} />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Delivered orders" value={delivered._count} icon={CheckCircle2} tone="success" />

@@ -126,14 +126,19 @@ export function ShopForm({
       };
       if (dealer) {
         const { ownerId: _o, commissionBps: _c, ...rest } = body;
-        const created = await api<{ id: string }>("/dealer/shops", { body: { ...rest, owner: { ...owner, phone: owner.phone || v.contactPhone } } });
-        toast.success("Shop onboarded and live. Share the login with the owner.");
+        const created = await api<{ id: string; ownerEmail: string; agreement: { sent: boolean; devLink?: string } | null }>("/dealer/shops", {
+          body: { ...rest, owner: { ...owner, phone: owner.phone || v.contactPhone } },
+        });
+        agreementToast(created.agreement, created.ownerEmail);
         router.push(`/dealer/shops/${created.id}`);
         router.refresh();
         return;
       }
-      const r = v.id ? await api<{ id: string }>(`/admin/shops/${v.id}`, { method: "PATCH", body }) : await api<{ id: string }>("/admin/shops", { body });
-      toast.success(v.id ? "Shop updated" : "Shop onboarded — activate it once ready");
+      type Created = { id: string; agreement?: { sent: boolean; sentTo: string; devLink?: string } | null };
+      const r = v.id ? await api<Created>(`/admin/shops/${v.id}`, { method: "PATCH", body }) : await api<Created>("/admin/shops", { body });
+      if (v.id) toast.success("Shop updated");
+      else if (r.agreement) agreementToast(r.agreement, r.agreement.sentTo);
+      else toast.success("Shop created. Assign an owner to send the seller agreement.");
       router.push(`/admin/shops/${r.id}`);
       router.refresh();
     } catch (err) {
@@ -385,4 +390,16 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/** After onboarding: tell who got the agreement email (the shop goes live when they sign). */
+function agreementToast(a: { sent: boolean; devLink?: string } | null, email: string) {
+  if (!a) toast.success("Shop onboarded.");
+  else if (!a.sent) toast.warning("Shop onboarded, but the agreement email couldn't be sent. Use Resend on the shop page.");
+  else
+    toast.success(
+      `Shop onboarded. Agreement emailed to ${email}. It goes live once the owner signs.`,
+      a.devLink ? { description: `Test mode link: ${a.devLink}`, duration: 20000 } : undefined,
+    );
+  if (a?.devLink) console.info("[agreement] signing link", a.devLink);
 }

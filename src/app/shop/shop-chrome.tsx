@@ -26,7 +26,7 @@ export function ShopChrome({
   ownerName,
   children,
 }: {
-  shop: { id: string; name: string; acceptingOrders: boolean; isActive: boolean; approvalStatus: string };
+  shop: { id: string; name: string; acceptingOrders: boolean; isActive: boolean; approvalStatus: string; agreementSigned: boolean };
   shops: { id: string; name: string }[];
   ownerName: string;
   children: React.ReactNode;
@@ -107,7 +107,7 @@ export function ShopChrome({
             <NotificationBell sound />
           </div>
         </div>
-        {(!shop.isActive || shop.approvalStatus !== "APPROVED") && (
+        {(!shop.isActive || shop.approvalStatus !== "APPROVED") && shop.agreementSigned && (
           <div className="bg-amber-100 px-4 py-1.5 text-center text-xs font-medium text-amber-900">
             {shop.approvalStatus !== "APPROVED" ? `Shop is ${shop.approvalStatus.toLowerCase()} — awaiting admin approval.` : "Shop is inactive — customers can't see it until the admin activates it."}
           </div>

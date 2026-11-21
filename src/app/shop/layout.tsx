@@ -5,6 +5,8 @@ import { activeShopFor } from "@/server/services/inventory";
 import { AppError } from "@/server/errors";
 import { EmptyState } from "@/components/shared/misc";
 import { ShopChrome } from "./shop-chrome";
+import { AgreementPending } from "./agreement-pending";
+import { db } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +27,17 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     throw e;
   }
   const { shop, shops } = ctx;
+  // Until the owner signs the seller agreement (emailed at onboarding) the panel shows only how to sign it.
+  const pending = shop.agreementAcceptedAt
+    ? null
+    : await db.shopAgreement.findFirst({ where: { shopId: shop.id, status: "PENDING" }, orderBy: { createdAt: "desc" }, select: { sentTo: true } });
   return (
     <ShopChrome
-      shop={{ id: shop.id, name: shop.name, acceptingOrders: shop.acceptingOrders, isActive: shop.isActive, approvalStatus: shop.approvalStatus }}
+      shop={{ id: shop.id, name: shop.name, acceptingOrders: shop.acceptingOrders, isActive: shop.isActive, approvalStatus: shop.approvalStatus, agreementSigned: !!shop.agreementAcceptedAt }}
       shops={shops.map((s) => ({ id: s.id, name: s.name }))}
       ownerName={user.name ?? "Owner"}
     >
-      {children}
+      {shop.agreementAcceptedAt ? children : <AgreementPending shopId={shop.id} shopName={shop.name} sentTo={pending?.sentTo ?? null} />}
     </ShopChrome>
   );
 }

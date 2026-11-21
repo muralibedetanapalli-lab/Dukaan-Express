@@ -26,6 +26,7 @@ export async function fixture(opts: { deliveryPincode?: string; stock?: number }
       contactPhone: "9845000002",
       approvalStatus: "APPROVED",
       isActive: true,
+      agreementAcceptedAt: new Date(),
       deliveryRadiusKm: 6,
       commissionBps: 1000,
       address: { create: { line1: "80 Feet Road, Koramangala", city: "Bengaluru", state: "Karnataka", pincode: "560034", latitude: 12.9352, longitude: 77.6245 } },

@@ -61,11 +61,14 @@ describe("rider self-signup and verification", () => {
     const other = await db.dealer.findUniqueOrThrow({ where: { id: otherId } });
     await expect(reviewKyc(asUser({ id: other.userId, role: "DEALER", dealerId: otherId }), rider.id, { approve: true })).rejects.toMatchObject({ status: 404 });
     const dealerUser = asUser({ id: dealer.userId, role: "DEALER", dealerId });
+    expect(await db.user.findUniqueOrThrow({ where: { id: rider.userId } })).toMatchObject({ welcomeSentAt: null, welcomeSecret: null });
     await reviewKyc(dealerUser, rider.id, { approve: false, reason: "Licence photo is blurry" });
+    expect((await db.user.findUniqueOrThrow({ where: { id: rider.userId } })).welcomeSentAt).toBeNull(); // not active yet
     expect(await db.rider.findUniqueOrThrow({ where: { id: rider.id } })).toMatchObject({ kycStatus: "REJECTED", kycNote: "Licence photo is blurry" });
     await saveKycDocument(me, "license", photo());
     await submitKyc(me, details);
     await reviewKyc(dealerUser, rider.id, { approve: true });
+    expect((await db.user.findUniqueOrThrow({ where: { id: rider.userId } })).welcomeSentAt).not.toBeNull(); // welcomed once approved
     await expect(reviewKyc(asUser(f.admin), rider.id, { approve: true })).rejects.toMatchObject({ status: 409 }); // already decided
 
     await expect(setOnline(me, true)).resolves.toEqual({ online: true });

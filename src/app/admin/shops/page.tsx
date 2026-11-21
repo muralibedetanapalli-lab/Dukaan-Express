@@ -88,7 +88,12 @@ export default async function AdminShopsPage({ searchParams }: { searchParams: P
                 <TableCell>
                   <div className="flex flex-col items-start gap-1">
                     <Pill tone={s.approvalStatus === "APPROVED" ? "success" : s.approvalStatus === "PENDING" ? "warning" : "danger"}>{s.approvalStatus.toLowerCase()}</Pill>
-                    {s.approvalStatus === "APPROVED" && <Pill tone={s.isActive ? "primary" : "neutral"}>{s.isActive ? "active" : "inactive"}</Pill>}
+                    {s.approvalStatus === "APPROVED" &&
+                      (!s.agreementAcceptedAt && !s.isActive ? (
+                        <Pill tone="warning">agreement pending</Pill>
+                      ) : (
+                        <Pill tone={s.isActive ? "primary" : "neutral"}>{s.isActive ? "active" : "inactive"}</Pill>
+                      ))}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -96,7 +101,7 @@ export default async function AdminShopsPage({ searchParams }: { searchParams: P
                     <ActionButton path={`/admin/shops/${s.id}/actions`} body={{ action: "approve" }} success="Shop approved">
                       Approve
                     </ActionButton>
-                  ) : s.approvalStatus === "APPROVED" ? (
+                  ) : s.approvalStatus === "APPROVED" && (s.isActive || s.agreementAcceptedAt) ? (
                     <ActionButton
                       path={`/admin/shops/${s.id}/actions`}
                       body={{ action: s.isActive ? "deactivate" : "activate" }}

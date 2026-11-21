@@ -14,6 +14,8 @@ import { ShopForm } from "../shop-form";
 import { regionFor } from "@/server/services/dealer";
 import { ShopDealerCard } from "./shop-dealer";
 import { ErpLink } from "@/components/admin/erp-link";
+import { AgreementCard } from "@/components/shared/agreement-card";
+import { agreementSummary } from "@/server/services/agreement";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
     },
   });
   if (!shop) notFound();
-  const [settings, categories, owners, perf, delivered, rejected, inventory, orders, dealers, areas] = await Promise.all([
+  const [settings, categories, owners, perf, delivered, rejected, inventory, orders, dealers, areas, agreement] = await Promise.all([
     getSettings(),
     db.category.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     db.shopOwner.findMany({ where: { user: { deletedAt: null } }, include: { user: true } }),
@@ -45,6 +47,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
     db.order.findMany({ where: { shopId: id }, orderBy: { createdAt: "desc" }, take: 50 }),
     db.dealer.findMany({ where: { user: { deletedAt: null, status: "ACTIVE" } }, include: { user: { select: { name: true } }, regions: { select: { city: true } } } }),
     db.serviceArea.findMany({ where: { dealerId: { not: null } }, select: { id: true, city: true, pincodes: true, dealerId: true } }),
+    agreementSummary(id),
   ]);
   const regionDealer = shop.address ? (regionFor(areas, shop.address) as (typeof areas)[number] | null)?.dealerId ?? null : null;
   const a = shop.address;
@@ -69,7 +72,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
                 Reject
               </ActionButton>
             )}
-            {shop.approvalStatus === "APPROVED" && (
+            {shop.approvalStatus === "APPROVED" && (shop.isActive || shop.agreementAcceptedAt) && (
               <ActionButton
                 path={`/admin/shops/${id}/actions`}
                 body={{ action: shop.isActive ? "deactivate" : "activate" }}
@@ -83,6 +86,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
           </>
         }
       />
+      {(!shop.agreementAcceptedAt || agreement) && <AgreementCard shopId={id} agreement={agreement} hasOwner={!!shop.owner?.user.email} />}
       <ShopDealerCard
         shopId={id}
         dealerId={shop.dealerId}

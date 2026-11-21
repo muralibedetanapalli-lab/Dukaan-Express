@@ -10,6 +10,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { audit } from "./audit";
 import { notifyShop, notifyUsers } from "./notification";
 import { DELIVERY_MODES } from "@/lib/delivery-mode";
+import { issueAgreementIfNeeded } from "./agreement";
+import { holdWelcome, releaseWelcome, updateHeldWelcome } from "./welcome";
 
 const actorOf = (u: SessionUser) => ({ id: u.id, role: u.role });
 
@@ -74,7 +76,7 @@ async function uniqueShopSlug(name: string, excludeId?: string) {
 
 const defaultHours = Array.from({ length: 7 }, (_, d) => ({ dayOfWeek: d, openTime: "07:00", closeTime: "23:00", isClosed: false }));
 
-export async function createShop(actor: SessionUser, input: ShopInput, opts: { dealerId?: string; goLive?: boolean } = {}) {
+export async function createShop(actor: SessionUser, input: ShopInput, opts: { dealerId?: string } = {}) {
   if (input.ownerId) await assertOwner(input.ownerId);
   const shop = await db.shop.create({
     data: {
@@ -92,10 +94,9 @@ export async function createShop(actor: SessionUser, input: ShopInput, opts: { d
       commissionBps: input.commissionBps ?? null,
       avgPrepMinutes: input.avgPrepMinutes,
       deliveryMode: input.deliveryMode ?? "RIDER",
-      // Admin-created shops are approved but start inactive until explicitly activated;
-      // shops onboarded by a dealer go live straight away.
+      // Approved, but inactive until the owner signs the seller agreement emailed below (signing activates it).
       approvalStatus: "APPROVED",
-      isActive: opts.goLive ?? false,
+      isActive: false,
       dealerId: opts.dealerId ?? null,
       address: { create: input.address },
       hours: { create: input.hours?.length ? input.hours : defaultHours },
@@ -103,7 +104,8 @@ export async function createShop(actor: SessionUser, input: ShopInput, opts: { d
     },
   });
   await audit(actorOf(actor), "shop.create", "Shop", shop.id, { after: input });
-  return shop;
+  const agreement = await issueAgreementIfNeeded(actor, shop.id);
+  return { ...shop, agreement };
 }
 
 export async function updateShop(actor: SessionUser, shopId: string, input: Partial<ShopInput>) {
@@ -136,6 +138,7 @@ export async function updateShop(actor: SessionUser, shopId: string, input: Part
     }
   });
   await audit(actorOf(actor), "shop.update", "Shop", shopId, { before, after: input });
+  if (input.ownerId && input.ownerId !== before.ownerId) await ownerJoined(actor, shopId, input.ownerId);
   return db.shop.findUniqueOrThrow({ where: { id: shopId } });
 }
 
@@ -164,6 +167,7 @@ export async function setShopActive(actor: SessionUser, shopId: string, active: 
   if (active && shop.approvalStatus !== "APPROVED") throw badRequest("Approve the shop before activating it");
   if (active && !shop.address) throw badRequest("Set the shop address and location before activating");
   if (active && !shop.ownerId) throw badRequest("Assign a shop owner before activating");
+  if (active && !shop.agreementAcceptedAt) throw badRequest("The owner hasn't signed the seller agreement yet. Resend it from this page if needed.");
   const updated = await db.shop.update({ where: { id: shopId }, data: { isActive: active } });
   if (!active) await db.cartItem.deleteMany({ where: { shopId } });
   await audit(actorOf(actor), active ? "shop.activate" : "shop.deactivate", "Shop", shopId);
@@ -205,6 +209,10 @@ export async function createOwner(actor: SessionUser, input: z.infer<typeof zOwn
   if (input.shopIds?.length) {
     await db.shop.updateMany({ where: { id: { in: input.shopIds } }, data: { ownerId: user.shopOwner!.id } });
   }
+  await holdWelcome(user.id, password);
+  if (input.shopIds?.length) {
+    for (const shopId of input.shopIds) await ownerJoined(actor, shopId, user.shopOwner!.id);
+  }
   await audit(actorOf(actor), "owner.create", "User", user.id, { after: { name: input.name, email: input.email, shopIds: input.shopIds } });
   return { id: user.id, ownerId: user.shopOwner!.id, temporaryPassword: input.password ? null : password };
 }
@@ -238,6 +246,7 @@ export async function resetPassword(actor: SessionUser, userId: string, newPassw
     data: { passwordHash: await hashPassword(password), sessionVersion: { increment: 1 } },
   });
   await audit(actorOf(actor), "user.password_reset", "User", userId);
+  await updateHeldWelcome(userId, password);
   await notifyUsers([userId], { type: "SHOP", title: "Password reset", body: "Your password was reset by the administrator." });
   return { temporaryPassword: newPassword ? null : password };
 }
@@ -246,7 +255,22 @@ export async function assignOwner(actor: SessionUser, shopId: string, ownerId: s
   if (ownerId) await assertOwner(ownerId);
   const shop = await db.shop.update({ where: { id: shopId }, data: { ownerId } });
   await audit(actorOf(actor), "shop.assign_owner", "Shop", shopId, { after: { ownerId } });
-  return shop;
+  const agreement = ownerId ? await ownerJoined(actor, shopId, ownerId) : null;
+  return { ...shop, agreement };
+}
+
+/**
+ * An owner was put on a shop: an unsigned shop gets the agreement emailed; a shop that already signed is live,
+ * so the owner gets their welcome (login details) now.
+ */
+async function ownerJoined(actor: SessionUser, shopId: string, ownerId: string) {
+  const shop = await db.shop.findUnique({ where: { id: shopId }, select: { agreementAcceptedAt: true, isActive: true } });
+  if (shop?.agreementAcceptedAt) {
+    const owner = await db.shopOwner.findUnique({ where: { id: ownerId }, select: { userId: true } });
+    if (owner && shop.isActive) await releaseWelcome(owner.userId);
+    return null;
+  }
+  return issueAgreementIfNeeded(actor, shopId);
 }
 
 // ───────────────────────────── Categories ─────────────────────────────

@@ -97,7 +97,7 @@ const EMAIL_CODE_MAX_PER_HOUR = 5;
 const SIGNUP_TOKEN_TTL = "30m";
 const SIGNUP_TOKEN_ISSUER = "dukaan-express:email-verified"; // distinct issuer, so it is never accepted as a session
 
-type EmailPurpose = "SIGNUP" | "RESET";
+export type EmailPurpose = "SIGNUP" | "RESET" | "AGREEMENT";
 export const normaliseEmail = (e: string) => e.trim().toLowerCase();
 const emailCodeHash = (email: string, purpose: EmailPurpose, code: string) => sha256(`${purpose}:${email}:${code}:${process.env.JWT_SECRET}`);
 const tokenKey = () => new TextEncoder().encode(process.env.JWT_SECRET);
@@ -105,7 +105,7 @@ const tokenKey = () => new TextEncoder().encode(process.env.JWT_SECRET);
 /** Show the code on screen only when no email provider is configured (dev, or a pilot that opted in). */
 const exposeCode = (mock: boolean) => mock && (process.env.NODE_ENV !== "production" || process.env.OTP_SANDBOX_IN_PRODUCTION === "true");
 
-async function issueEmailCode(email: string, purpose: EmailPurpose) {
+export async function issueEmailCode(email: string, purpose: EmailPurpose) {
   const since = new Date(Date.now() - 3600_000);
   const recent = await db.emailCode.findMany({ where: { email, purpose, createdAt: { gte: since } }, orderBy: { createdAt: "desc" } });
   if (recent.length >= EMAIL_CODE_MAX_PER_HOUR) throw tooMany("Too many codes requested. Please try again in an hour.");
@@ -113,16 +113,21 @@ async function issueEmailCode(email: string, purpose: EmailPurpose) {
   const code = randomDigits(6);
   await db.emailCode.create({ data: { email, purpose, codeHash: emailCodeHash(email, purpose, code), expiresAt: new Date(Date.now() + EMAIL_CODE_TTL_MS) } });
   const brand = (await getSettings()).platform.name;
-  const copy =
-    purpose === "SIGNUP"
-      ? { subject: `${code} is your ${brand} verification code`, heading: "Verify your email", intro: `Enter this code to verify your email and finish creating your ${brand} account.` }
-      : { subject: `${code} is your ${brand} password reset code`, heading: "Reset your password", intro: `Enter this code to set a new password for your ${brand} account.` };
+  const copy = {
+    SIGNUP: { subject: `${code} is your ${brand} verification code`, heading: "Verify your email", intro: `Enter this code to verify your email and finish creating your ${brand} account.` },
+    RESET: { subject: `${code} is your ${brand} password reset code`, heading: "Reset your password", intro: `Enter this code to set a new password for your ${brand} account.` },
+    AGREEMENT: {
+      subject: `${code} is your code to sign the ${brand} seller agreement`,
+      heading: "Sign your seller agreement",
+      intro: `Enter this code on the agreement page to confirm and sign your ${brand} seller agreement.`,
+    },
+  }[purpose];
   const body = codeEmail({ brand, heading: copy.heading, intro: copy.intro, code, minutes: EMAIL_CODE_TTL_MS / 60_000 });
   const { mock } = await sendEmail({ to: email, subject: copy.subject, ...body });
   return { sent: true, expiresInSeconds: EMAIL_CODE_TTL_MS / 1000, devCode: exposeCode(mock) ? code : undefined, emailMode: integrationModes().email };
 }
 
-async function consumeEmailCode(email: string, purpose: EmailPurpose, code: string) {
+export async function consumeEmailCode(email: string, purpose: EmailPurpose, code: string) {
   const row = await db.emailCode.findFirst({ where: { email, purpose, consumedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } });
   if (!row) throw badRequest("Code expired or not requested. Please request a new code.");
   if (row.attempts >= EMAIL_CODE_MAX_ATTEMPTS) throw tooMany("Too many incorrect attempts. Please request a new code.");

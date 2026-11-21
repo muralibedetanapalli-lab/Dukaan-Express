@@ -73,7 +73,9 @@ describe("dealers (integration)", () => {
 
     const r = await dealerOnboardShop(actor, zDealerShopInput.parse(base));
     const shop = await db.shop.findUniqueOrThrow({ where: { id: r.id }, include: { owner: { include: { user: true } } } });
-    expect(shop).toMatchObject({ dealerId: actor.dealerId, approvalStatus: "APPROVED", isActive: true, commissionBps: null });
+    // Not live until the owner signs the emailed seller agreement.
+    expect(shop).toMatchObject({ dealerId: actor.dealerId, approvalStatus: "APPROVED", isActive: false, agreementAcceptedAt: null, commissionBps: null });
+    expect(r.agreement).toMatchObject({ sent: true, sentTo: "kiran@shop.in" });
     expect(shop.owner?.user).toMatchObject({ role: "SHOP_OWNER", email: "kiran@shop.in" });
 
     // City-only region (no pincodes) matches on city name once assigned.
