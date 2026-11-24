@@ -133,9 +133,20 @@ export function MapPicker({
 
   function myLocation() {
     if (!navigator.geolocation) return toast.error("Location isn't available on this device");
+    const ok = (pos: GeolocationPosition) => goTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 18);
+    const fail = (e: GeolocationPositionError) =>
+      toast.error(
+        e.code === e.PERMISSION_DENIED
+          ? "Location permission is off. Allow it for this app in your phone's Settings (Apps → Permissions → Location), or search your area."
+          : "Couldn't get your location. Turn on location (GPS), or search your area.",
+      );
+    // Precise GPS first; indoors it often times out, so fall back to a quicker network-based fix.
     navigator.geolocation.getCurrentPosition(
-      (pos) => goTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 18),
-      () => toast.error("Couldn't get your location. Allow location access, or search your area."),
+      ok,
+      (e) => {
+        if (e.code === e.PERMISSION_DENIED) return fail(e);
+        navigator.geolocation.getCurrentPosition(ok, fail, { enableHighAccuracy: false, timeout: 15_000, maximumAge: 120_000 });
+      },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   }

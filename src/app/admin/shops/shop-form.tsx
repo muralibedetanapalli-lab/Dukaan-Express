@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, LocateFixed, MapPin } from "lucide-react";
+import { CheckCircle2, CopyCheck, Loader2, LocateFixed, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -358,17 +358,36 @@ export function ShopForm({
         </div>
         <div>
           <Label className="mb-2 block text-xs">Opening & closing hours</Label>
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid gap-2 sm:grid-cols-2 sm:gap-x-6">
             {v.hours.map((h, i) => (
-              <li key={h.dayOfWeek} className="flex items-center gap-2">
-                <span className="w-10 text-sm font-medium">{DAYS[h.dayOfWeek]}</span>
+              <li key={h.dayOfWeek} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border p-2 sm:border-0 sm:p-0">
+                <span className="w-9 text-sm font-medium">{DAYS[h.dayOfWeek]}</span>
                 <Switch
                   checked={!h.isClosed}
                   onCheckedChange={(on) => set("hours", v.hours.map((x, j) => (j === i ? { ...x, isClosed: !on } : x)))}
                   aria-label={`${DAYS[h.dayOfWeek]} open`}
                 />
-                <Input type="time" value={h.openTime} disabled={h.isClosed} onChange={(e) => set("hours", v.hours.map((x, j) => (j === i ? { ...x, openTime: e.target.value } : x)))} className="w-28" />
-                <Input type="time" value={h.closeTime} disabled={h.isClosed} onChange={(e) => set("hours", v.hours.map((x, j) => (j === i ? { ...x, closeTime: e.target.value } : x)))} className="w-28" />
+                {i === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      set("hours", v.hours.map((x) => ({ ...x, openTime: h.openTime, closeTime: h.closeTime, isClosed: h.isClosed })));
+                      toast.success(`${DAYS[h.dayOfWeek]}'s timing copied to all days`);
+                    }}
+                    className="ml-auto flex items-center gap-1 text-xs font-semibold text-primary hover:underline sm:order-last sm:basis-full sm:justify-end"
+                  >
+                    <CopyCheck className="size-3.5" /> Copy to all days
+                  </button>
+                )}
+                {h.isClosed ? (
+                  <span className="text-sm text-muted-foreground sm:flex-1">Closed</span>
+                ) : (
+                  <div className="flex min-w-0 basis-full items-center gap-1.5 sm:flex-1 sm:basis-auto">
+                    <Input type="time" value={h.openTime} onChange={(e) => set("hours", v.hours.map((x, j) => (j === i ? { ...x, openTime: e.target.value } : x)))} className="min-w-0 flex-1 px-2 text-sm" aria-label={`${DAYS[h.dayOfWeek]} opens`} />
+                    <span className="text-xs text-muted-foreground">to</span>
+                    <Input type="time" value={h.closeTime} onChange={(e) => set("hours", v.hours.map((x, j) => (j === i ? { ...x, closeTime: e.target.value } : x)))} className="min-w-0 flex-1 px-2 text-sm" aria-label={`${DAYS[h.dayOfWeek]} closes`} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -376,7 +395,7 @@ export function ShopForm({
       </Card>
       <div className="flex justify-end">
         <Button type="submit" size="lg" disabled={busy}>
-          {busy && <Loader2 className="animate-spin" />} {v.id ? "Save changes" : dealer ? "Onboard shop & go live" : "Onboard shop"}
+          {busy && <Loader2 className="animate-spin" />} {v.id ? "Save changes" : "Onboard shop"}
         </Button>
       </div>
     </form>

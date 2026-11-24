@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, KeyRound, Loader2 } from "lucide-react";
+import { Clock, CopyCheck, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -69,6 +69,18 @@ export function ShopSettingsClient({
                   <span className="text-sm text-muted-foreground">to</span>
                   <Input type="time" value={h.closeTime} onChange={(e) => setHours((hs) => hs.map((x, j) => (j === i ? { ...x, closeTime: e.target.value } : x)))} className="w-32" />
                 </>
+              )}
+              {i === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHours((hs) => hs.map((x) => ({ ...x, openTime: h.openTime, closeTime: h.closeTime, isClosed: h.isClosed })));
+                    toast.success(`${DAYS[h.dayOfWeek]}'s timing copied to all days. Save to apply.`);
+                  }}
+                  className="flex w-full items-center justify-end gap-1 text-xs font-semibold text-primary hover:underline sm:ml-auto sm:w-auto"
+                >
+                  <CopyCheck className="size-3.5" /> Copy to all days
+                </button>
               )}
             </li>
           ))}
